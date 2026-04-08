@@ -1,0 +1,172 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+signbridge/
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Cursor / Claude local
+.claude/
+
+# Third-party example repos (large trees; keep locally, do not version)
+Example projects/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Data files (large datasets)
+data/raw/**/*
+!data/raw/**/*.md
+!data/raw/**/.gitkeep
+data/processed/**/*
+!data/processed/**/*.md
+!data/processed/**/.gitkeep
+data/datasets/**/*
+!data/datasets/**/*.md
+!data/datasets/**/.gitkeep
+
+# Keep annotation files (small)
+!data/annotations/**/*.json
+
+# Model checkpoints (large)
+models/checkpoints/**/*.pth
+models/checkpoints/**/*.pt
+models/checkpoints/**/*.ckpt
+models/checkpoints/**/*.h5
+models/checkpoints/**/*.pkl
+!models/checkpoints/.gitkeep
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis
+dump.rdb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Node (Frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# Build outputs
+frontend/build/
+frontend/dist/
+*.bundle.js
+
+# Docker
+.dockerignore
+
+# Temp files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# OS
+Thumbs.db
+.DS_Store
+# Windows reserved name mistaken as file
+nul
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Large media files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+!data/raw/reference_images/*.png
+!data/raw/reference_images/*.jpg
+!data/raw/reference_images/*.PNG
+
+# TensorBoard
+runs/
+tensorboard_logs/
+
+# Weights & Biases
+wandb/
+
+# Secrets
+secrets/
+*.pem
+*.key
+credentials.json
+
+# Backup files
+*.bak
+*.backup
+*~

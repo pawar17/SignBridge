@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: signbridge-postgres
+    environment:
+      POSTGRES_USER: signbridge_user
+      POSTGRES_PASSWORD: signbridge_pass
+      POSTGRES_DB: signbridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signbridge_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - signbridge-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: signbridge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - signbridge-network
+
+  # Backend API
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: signbridge-backend
+    environment:
+      - DATABASE_URL=postgresql://signbridge_user:signbridge_pass@postgres:5432/signbridge
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - APP_ENV=development
+      - DEBUG=True
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app/backend
+      - ../models:/app/models
+      - ../data:/app/data
+      - ../logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - signbridge-network
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: signbridge-celery-worker
+    environment:
+      - DATABASE_URL=postgresql://signbridge_user:signbridge_pass@postgres:5432/signbridge
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - APP_ENV=development
+    volumes:
+      - ../backend:/app/backend
+      - ../models:/app/models
+      - ../data:/app/data
+      - ../logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A backend.services.celery_app worker --loglevel=info
+    networks:
+      - signbridge-network
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: signbridge-celery-beat
+    environment:
+      - DATABASE_URL=postgresql://signbridge_user:signbridge_pass@postgres:5432/signbridge
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - APP_ENV=development
+    volumes:
+      - ../backend:/app/backend
+      - ../models:/app/models
+      - ../logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A backend.services.celery_app beat --loglevel=info
+    networks:
+      - signbridge-network
+
+  # Flower (Celery Monitoring)
+  flower:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: signbridge-flower
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery-worker
+    command: celery -A backend.services.celery_app flower --port=5555
+    networks:
+      - signbridge-network
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: signbridge-frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+    command: npm start
+    networks:
+      - signbridge-network
+
+  # pgAdmin (Database Management Tool - Optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: signbridge-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@signbridge.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - signbridge-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+
+networks:
+  signbridge-network:
+    driver: bridge
