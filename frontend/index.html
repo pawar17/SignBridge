@@ -3,917 +3,1317 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SignBridge - Complete ASL Platform</title>
+    <title>SignBridge — Real-Time Sign Language Translation</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --secondary: #764ba2;
+            --accent: #48bb78;
+            --accent2: #38b2ac;
+            --danger: #fc8181;
+            --warn: #f6ad55;
+            --speech: #f687b3;
+            --bg: #0f0f1a;
+            --surface: #1a1a2e;
+            --surface2: #252540;
+            --surface3: #2e2e50;
+            --border: rgba(102,126,234,0.25);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --radius: 12px;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+        body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
 
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 1400px;
-            width: 100%;
-            padding: 40px;
-            margin: 0 auto;
-        }
-
+        /* ── HEADER ── */
         header {
-            text-align: center;
-            margin-bottom: 30px;
+            background: linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex; align-items: center; justify-content: space-between;
         }
+        .logo { display:flex; align-items:center; gap:10px; }
+        .logo-icon { font-size:1.8em; }
+        .logo-text { font-size:1.4em; font-weight:700; background:linear-gradient(90deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .logo-tag  { font-size:0.7em; color:var(--text-muted); }
+        .header-right { display:flex; align-items:center; gap:12px; }
+        #status-dot { display:flex; align-items:center; gap:8px; font-size:.82em; padding:5px 12px; background:var(--surface3); border-radius:20px; }
+        .dot { width:9px; height:9px; border-radius:50%; background:var(--warn); flex-shrink:0; }
+        .dot.ok { background:var(--accent); }
+        .dot.err { background:var(--danger); }
 
-        h1 {
-            color: #667eea;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
+        /* ElevenLabs API key pill */
+        #eleven-status { font-size:.78em; padding:4px 10px; border-radius:20px; background:var(--surface3); color:var(--text-muted); cursor:pointer; border:1px solid var(--border); }
+        #eleven-status.ok { color:#fbd38d; border-color:rgba(246,173,85,.4); }
 
-        .subtitle {
-            color: #666;
-            font-size: 1.1em;
-        }
+        /* ── TABS ── */
+        nav.tabs { display:flex; gap:6px; padding:14px 24px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+        .tab { padding:9px 20px; font-size:.9em; font-weight:600; border:1px solid transparent; border-radius:var(--radius) var(--radius) 0 0; background:var(--surface2); color:var(--text-muted); cursor:pointer; transition:all .2s; border-bottom:none; position:relative; bottom:-1px; }
+        .tab:hover { background:var(--surface3); color:var(--text); }
+        .tab.active { background:var(--surface); color:var(--primary); border-color:var(--border); border-bottom-color:var(--surface); }
 
-        /* Mode Toggle */
-        .mode-toggle {
-            display: flex;
-            gap: 10px;
-            margin: 20px 0;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+        /* ── LAYOUT ── */
+        main { padding:20px 24px; max-width:1500px; margin:0 auto; }
+        .mode { display:none; }
+        .mode.active { display:block; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:16px; }
+        @media(max-width:900px){ .grid2 { grid-template-columns:1fr; } }
+        .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; position:relative; }
+        .panel-title { font-size:.78em; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:12px; }
 
-        .mode-btn {
-            padding: 15px 30px;
-            font-size: 1.1em;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
+        /* ── LANG BAR ── */
+        .lang-bar { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 16px; margin-bottom:16px; flex-wrap:wrap; }
+        .lang-bar label { font-size:.82em; color:var(--text-muted); white-space:nowrap; }
+        .lang-bar select { background:var(--surface3); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:.88em; cursor:pointer; }
+        .lang-arrow { font-size:1.2em; color:var(--primary); }
+        .lang-note  { font-size:.73em; color:var(--text-muted); margin-left:auto; font-style:italic; }
 
-        .mode-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
+        /* ── VIDEO / AVATAR ── */
+        .video-wrap { width:100%; aspect-ratio:4/3; background:#000; border-radius:8px; overflow:hidden; position:relative; }
+        .video-wrap video { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
+        .hand-guide { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:52%; aspect-ratio:1/1; border:2px dashed rgba(102,126,234,.65); border-radius:12px; pointer-events:none; }
+        .hand-guide::after { content:'Position hand here'; position:absolute; bottom:-22px; left:50%; transform:translateX(-50%); font-size:.66em; color:rgba(102,126,234,.85); white-space:nowrap; font-weight:600; }
+        .cam-off { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--text-muted); }
+        .cam-off-icon { font-size:2.5em; }
+        .avatar-wrap { width:100%; aspect-ratio:4/3; background:#0a0a1a; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
 
-        .mode-btn.active {
-            background: #667eea;
-            color: white;
-        }
+        /* ── CONTROLS ── */
+        .controls { display:flex; gap:7px; flex-wrap:wrap; margin-top:12px; }
+        .btn { padding:8px 16px; font-size:.84em; font-weight:600; border:none; border-radius:8px; cursor:pointer; transition:all .2s; white-space:nowrap; }
+        .btn:disabled { opacity:.4; cursor:not-allowed; }
+        .btn-primary  { background:var(--primary); color:#fff; }
+        .btn-primary:hover:not(:disabled)  { background:var(--primary-dark); }
+        .btn-success  { background:#2f855a; color:#fff; }
+        .btn-success:hover:not(:disabled)  { background:#276749; }
+        .btn-speech   { background:rgba(246,135,179,.2); color:var(--speech); border:1px solid rgba(246,135,179,.4); }
+        .btn-speech:hover:not(:disabled)   { background:rgba(246,135,179,.35); }
+        .btn-speech.active  { background:var(--speech); color:#1a1a2e; }
+        .btn-eleven   { background:rgba(246,173,85,.15); color:#fbd38d; border:1px solid rgba(246,173,85,.4); }
+        .btn-eleven:hover:not(:disabled)   { background:rgba(246,173,85,.3); }
+        .btn-outline  { background:transparent; color:var(--primary); border:1px solid var(--primary); }
+        .btn-outline:hover:not(:disabled)  { background:rgba(102,126,234,.12); }
+        .btn-ghost    { background:var(--surface3); color:var(--text-muted); border:1px solid var(--border); }
+        .btn-ghost:hover:not(:disabled)    { background:var(--surface2); color:var(--text); }
+        .btn.active   { background:var(--secondary); color:#fff; }
 
-        /* Hide inactive sections */
-        .mode-section {
-            display: none;
-        }
+        /* ── RESULT AREA ── */
+        .predicted-letter { font-size:7em; font-weight:900; text-align:center; line-height:1; color:var(--primary); text-shadow:0 0 30px rgba(102,126,234,.4); padding:12px 0; min-height:110px; }
+        .conf-label { font-size:.78em; color:var(--text-muted); margin-bottom:5px; }
+        .conf-bar { width:100%; height:20px; background:var(--surface3); border-radius:10px; overflow:hidden; margin-bottom:12px; }
+        .conf-fill { height:100%; border-radius:10px; transition:width .4s ease,background .4s; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; font-size:.73em; font-weight:700; color:#fff; min-width:32px; }
+        .top3 { margin-bottom:14px; }
+        .top3-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; margin:3px 0; background:var(--surface2); border-radius:6px; font-size:.83em; }
+        .top3-item:first-child { background:rgba(102,126,234,.15); }
+        .top3-rank { color:var(--text-muted); width:18px; }
+        .top3-letter { font-weight:700; font-size:1.1em; width:24px; }
+        .top3-bar { flex:1; height:5px; background:var(--surface3); border-radius:3px; margin:0 8px; overflow:hidden; }
+        .top3-bar-fill { height:100%; background:var(--primary); border-radius:3px; }
+        .top3-pct { color:var(--text-muted); width:38px; text-align:right; }
 
-        .mode-section.active {
-            display: block;
-        }
+        /* ── HAND-DETECTED INDICATOR ── */
+        .hand-status { display:inline-flex; align-items:center; gap:6px; font-size:.78em; padding:3px 10px; border-radius:20px; margin-bottom:10px; }
+        .hand-status.detected  { background:rgba(72,187,120,.15); color:var(--accent);  border:1px solid rgba(72,187,120,.3); }
+        .hand-status.missing   { background:rgba(252,129,129,.12); color:var(--danger); border:1px solid rgba(252,129,129,.25); }
 
-        /* Common Styles */
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
+        /* ── TEXT OUTPUT ── */
+        .text-output-section { margin-top:auto; }
+        .text-output-label { font-size:.73em; text-transform:uppercase; color:var(--text-muted); letter-spacing:.06em; margin-bottom:5px; }
+        .text-output { min-height:68px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px; font-size:1.05em; font-weight:500; color:var(--text); outline:none; word-break:break-word; transition:border-color .2s; line-height:1.6; }
+        .text-output:focus { border-color:var(--primary); }
+        .text-output:empty::before { content:'Translation appears here…'; color:var(--text-muted); font-style:italic; }
+        .text-actions { display:flex; gap:7px; margin-top:7px; flex-wrap:wrap; }
 
-        .video-section, .result-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-        }
+        /* ── SPEECH-TO-TEXT INPUT ── */
+        .stt-section { margin-top:14px; background:var(--surface2); border:1px solid rgba(246,135,179,.25); border-radius:var(--radius); padding:14px; }
+        .stt-title { font-size:.78em; font-weight:700; color:var(--speech); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+        .stt-transcript { min-height:44px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:.95em; color:var(--text); font-style:italic; }
+        .stt-transcript:empty::before { content:'Speak to see transcript…'; color:var(--text-muted); }
+        .mic-pulse { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--speech); }
+        @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:.7} }
+        .mic-pulse.active { animation:pulse 1s infinite; }
 
-        .section-title {
-            font-size: 1.3em;
-            color: #333;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
+        /* ── SENTENCE STRIP ── */
+        .sentence-strip { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:none; }
+        .sentence-strip.show { display:block; }
+        .sentence-label { font-size:.73em; text-transform:uppercase; color:var(--text-muted); letter-spacing:.06em; margin-bottom:5px; }
+        .sentence-text { font-size:1.55em; font-weight:700; color:var(--primary); letter-spacing:4px; min-height:36px; }
+        .sentence-actions { display:flex; gap:7px; margin-top:8px; }
 
-        .video-container {
-            position: relative;
-        }
+        /* ── SIGN-TO-SIGN ── */
+        .s2s-info { padding:8px 0; }
+        .sign-detected { font-size:.84em; margin-bottom:6px; }
+        .sign-detected span { font-size:1.1em; font-weight:700; color:var(--primary); }
 
-        #webcam, #webcamLearn {
-            width: 100%;
-            border-radius: 10px;
-            background: #000;
-            min-height: 300px;
-        }
+        /* ── CONVERSATION ── */
+        .conv-grid { display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:start; }
+        @media(max-width:820px){ .conv-grid { grid-template-columns:1fr; } }
+        .user-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+        .user-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .user-title { font-size:.88em; font-weight:700; }
+        .toggle-col { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:0 6px; min-width:80px; }
+        .toggle-icon { font-size:1.8em; color:var(--text-muted); }
+        .conv-label { font-size:.63em; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); text-align:center; }
+        .badge { display:inline-block; font-size:.68em; font-weight:700; padding:3px 9px; border-radius:20px; text-transform:uppercase; letter-spacing:.05em; }
+        .badge-actor  { background:rgba(102,126,234,.25); color:#a5b4fc; }
+        .badge-recv   { background:rgba(72,187,120,.20);  color:#68d391; }
+        .badge-input  { background:rgba(246,173,85,.20);  color:#fbd38d; }
+        .badge-output { background:rgba(118,75,162,.30);  color:#d6bcfa; }
+        .conv-mini-conf { height:7px; background:var(--surface3); border-radius:4px; overflow:hidden; margin-top:7px; }
+        .conv-mini-fill { height:100%; background:var(--primary); border-radius:4px; transition:width .4s; }
 
-        #canvas, #canvasLearn {
-            display: none;
-        }
+        /* ── SPEECH PLAYBACK INDICATOR ── */
+        .speaking-badge { display:none; position:absolute; top:10px; right:10px; background:rgba(246,135,179,.25); color:var(--speech); font-size:.68em; font-weight:700; padding:3px 8px; border-radius:20px; border:1px solid rgba(246,135,179,.4); }
+        .speaking-badge.show { display:block; }
 
-        .controls {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+        /* ── PLAYBACK BADGE ── */
+        .playback-badge { display:none; position:absolute; top:10px; right:10px; background:rgba(246,173,85,.25); color:var(--warn); font-size:.68em; font-weight:700; padding:3px 8px; border-radius:20px; border:1px solid rgba(246,173,85,.4); }
+        .playback-badge.show { display:block; }
 
-        button {
-            padding: 12px 30px;
-            font-size: 1em;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
+        /* ── API KEY MODAL ── */
+        #key-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; }
+        #key-modal.show { display:flex; }
+        .key-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:28px; width:420px; max-width:90vw; }
+        .key-box h3 { margin-bottom:8px; font-size:1.1em; color:var(--primary); }
+        .key-box p  { font-size:.85em; color:var(--text-muted); margin-bottom:16px; line-height:1.5; }
+        .key-input { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-size:.95em; margin-bottom:12px; }
+        .key-input:focus { outline:none; border-color:var(--primary); }
+        .key-actions { display:flex; gap:8px; justify-content:flex-end; }
 
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
+        /* ── ALPHA REF ── */
+        .alpha-grid { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+        .alpha-chip { background:var(--surface3); color:var(--text-muted); padding:4px 9px; border-radius:6px; font-size:.78em; font-weight:600; }
 
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
+        /* ── TOAST ── */
+        #toast { position:fixed; bottom:22px; right:22px; z-index:999; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 16px; font-size:.85em; max-width:300px; transform:translateY(60px); opacity:0; transition:all .3s; pointer-events:none; }
+        #toast.show { transform:translateY(0); opacity:1; }
 
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #218838;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .prediction-result {
-            text-align: center;
-            padding: 30px;
-        }
-
-        .predicted-sign {
-            font-size: 6em;
-            font-weight: bold;
-            color: #667eea;
-            margin: 20px 0;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .confidence {
-            font-size: 1.5em;
-            color: #666;
-            margin: 10px 0;
-        }
-
-        .confidence-bar {
-            width: 100%;
-            height: 30px;
-            background: #e0e0e0;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.5s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
-        .top-predictions {
-            margin-top: 30px;
-            text-align: left;
-        }
-
-        .top-pred-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            margin: 5px 0;
-            background: white;
-            border-radius: 8px;
-        }
-
-        .sentence-section {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-            margin-top: 20px;
-        }
-
-        .sentence-display {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            min-height: 80px;
-            margin: 15px 0;
-        }
-
-        .sentence-text {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-            text-align: center;
-            letter-spacing: 3px;
-            min-height: 40px;
-        }
-
-        .sentence-controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-        }
-
-        .status {
-            text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-weight: 500;
-        }
-
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .alphabet-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .alphabet-letter {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.5em;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .alphabet-letter:hover {
-            transform: scale(1.1);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
-        }
-
-        .alphabet-reference {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .alphabet-letter-small {
-            background: #667eea;
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.2em;
-        }
-
-        .lesson-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-        }
-
-        .lesson-card h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        .lesson-card ul {
-            margin-left: 20px;
-            line-height: 1.8;
-        }
-
-        .lesson-card p {
-            line-height: 1.6;
-            color: #555;
-        }
-
-        .practice-feedback {
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-            font-size: 1.1em;
-            text-align: center;
-        }
-
-        .feedback-correct {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
-        }
-
-        .feedback-incorrect {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #f5c6cb;
-        }
-
-        .feedback-correct h3, .feedback-incorrect h3 {
-            font-size: 1.5em;
-            margin-bottom: 10px;
-        }
-
-        .back-button {
-            margin-bottom: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-
-            h1 {
-                font-size: 2em;
-            }
-
-            .predicted-sign {
-                font-size: 4em;
-            }
-        }
+        /* ── DATASETS SECTION ── */
+        .dataset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-top:12px; }
+        .ds-chip { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:.82em; }
+        .ds-chip-name { font-weight:700; color:var(--text); margin-bottom:3px; }
+        .ds-chip-meta { color:var(--text-muted); font-size:.85em; }
+        .ds-chip-status { display:inline-block; padding:2px 8px; border-radius:20px; font-size:.75em; margin-top:4px; }
+        .ds-chip-status.local  { background:rgba(72,187,120,.2); color:var(--accent); }
+        .ds-chip-status.online { background:rgba(102,126,234,.2); color:var(--primary); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🤟 SignBridge</h1>
-            <p class="subtitle">Complete ASL Learning & Recognition Platform</p>
-        </header>
 
-        <!-- Mode Toggle -->
-        <div class="mode-toggle">
-            <button class="mode-btn active" onclick="switchMode('prediction')">
-                🎯 Prediction Mode
-            </button>
-            <button class="mode-btn" onclick="switchMode('learning')">
-                📚 Learning Mode
-            </button>
+<!-- ───────────────── HEADER ───────────────── -->
+<header>
+    <div class="logo">
+        <span class="logo-icon">🤟</span>
+        <div>
+            <div class="logo-text">SignBridge</div>
+            <div class="logo-tag">Real-Time Bidirectional Sign Language Translation</div>
+        </div>
+    </div>
+    <div class="header-right">
+        <button id="eleven-status" onclick="showKeyModal()">🔊 ElevenLabs: not set</button>
+        <div id="status-dot">
+            <div class="dot" id="dot"></div>
+            <span id="status-text">Connecting…</span>
+        </div>
+    </div>
+</header>
+
+<!-- ───────────────── TABS ───────────────── -->
+<nav class="tabs">
+    <button class="tab active" onclick="switchMode('s2t')">🎯 Sign → Text</button>
+    <button class="tab" onclick="switchMode('s2speech')">🔊 Sign → Speech</button>
+    <button class="tab" onclick="switchMode('stt')">🎤 Speech → Text</button>
+    <button class="tab" onclick="switchMode('s2s')">🤝 Sign → Sign</button>
+    <button class="tab" onclick="switchMode('conv')">💬 Conversation</button>
+    <button class="tab" onclick="switchMode('datasets')">📊 Datasets</button>
+</nav>
+
+<main>
+
+<!-- ═══════════ SIGN-TO-TEXT ═══════════ -->
+<div id="mode-s2t" class="mode active">
+    <div class="lang-bar">
+        <label>Sign Language:</label>
+        <select id="s2t-input-lang" onchange="onLangChange('s2t')">
+            <option value="ASL">🇺🇸 ASL (American)</option>
+            <option value="BSL">🇬🇧 BSL (British)</option>
+            <option value="ISL">🇮🇳 ISL (Indian)</option>
+            <option value="GSL">🇬🇷 GSL (Greek)</option>
+        </select>
+        <span class="lang-arrow">→</span>
+        <label>Output Text:</label>
+        <select id="s2t-output-lang">
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="fr">French</option>
+        </select>
+        <span class="lang-note" id="s2t-model-note">Landmark-based MLP</span>
+    </div>
+
+    <div class="grid2">
+        <!-- Camera -->
+        <div class="panel">
+            <div class="panel-title">📹 Camera Input</div>
+            <div class="video-wrap">
+                <video id="video-s2t" autoplay playsinline muted></video>
+                <div class="hand-guide" id="guide-s2t" style="display:none"></div>
+                <div class="cam-off" id="cam-s2t-off"><div class="cam-off-icon">📷</div><div>Camera off</div></div>
+            </div>
+            <canvas id="canvas-s2t" style="display:none"></canvas>
+            <div class="controls">
+                <button class="btn btn-primary" id="btn-start-s2t" onclick="startCamera('s2t')">▶ Start Camera</button>
+                <button class="btn btn-ghost" id="btn-capture-s2t" onclick="captureOnce('s2t')" disabled>📸 Predict Once</button>
+                <button class="btn btn-ghost" id="btn-auto-s2t" onclick="toggleAuto('s2t')" disabled>🔄 Auto: OFF</button>
+                <button class="btn btn-ghost" id="btn-sentence-s2t" onclick="toggleSentence('s2t')" disabled>💬 Sentence: OFF</button>
+            </div>
         </div>
 
-        <div id="status" class="status info">
-            Initializing... Please wait
-        </div>
-
-        <!-- PREDICTION MODE -->
-        <div id="predictionMode" class="mode-section active">
-            <div class="main-content">
-                <div class="video-section">
-                    <h2 class="section-title">📹 Webcam</h2>
-                    <div class="video-container">
-                        <video id="webcam" autoplay playsinline></video>
-                    </div>
-                    <canvas id="canvas"></canvas>
-                    <div class="controls">
-                        <button class="btn-primary" id="startBtn" onclick="startWebcam()">Start Camera</button>
-                        <button class="btn-secondary" id="captureBtn" onclick="captureAndPredict()" disabled>Predict Sign</button>
-                        <button class="btn-secondary" id="autoBtn" onclick="toggleAuto()" disabled>Auto Mode: OFF</button>
-                        <button class="btn-success" id="sentenceBtn" onclick="toggleSentenceMode()" disabled>Sentence Mode: OFF</button>
-                    </div>
-                </div>
-
-                <div class="result-section">
-                    <h2 class="section-title">🎯 Prediction</h2>
-                    <div class="prediction-result">
-                        <div class="predicted-sign" id="predictedSign">-</div>
-                        <div class="confidence" id="confidenceText">Confidence: -</div>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill" id="confidenceFill" style="width: 0%">0%</div>
-                        </div>
-                        <div class="top-predictions" id="topPredictions"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sentence Translation Section -->
-            <div class="sentence-section" id="sentenceSection" style="display: none;">
-                <h2 class="section-title">💬 Sentence Builder</h2>
-                <div class="sentence-display">
-                    <div class="sentence-text" id="sentenceText"></div>
-                </div>
-                <div class="sentence-controls">
-                    <button class="btn-secondary" onclick="clearSentence()">Clear Sentence</button>
-                    <button class="btn-success" onclick="speakSentence()">🔊 Speak</button>
-                </div>
-            </div>
-
-            <div class="video-section">
-                <h2 class="section-title">🔤 Supported Signs</h2>
-                <div class="alphabet-reference" id="alphabetRef"></div>
-            </div>
-        </div>
-
-        <!-- LEARNING MODE -->
-        <div id="learningMode" class="mode-section">
-            <!-- Letter Selection -->
-            <div id="letterSelection">
-                <h2 class="section-title">Choose a Letter to Learn</h2>
-                <div class="alphabet-grid" id="alphabetGrid"></div>
-            </div>
-
-            <!-- Lesson Display -->
-            <div id="lessonContent" style="display:none;">
-                <div class="back-button">
-                    <button class="btn-secondary" onclick="backToSelection()">← Back to Letter Selection</button>
-                </div>
-
-                <div class="main-content">
-                    <!-- Practice Section -->
-                    <div class="video-section">
-                        <h2 class="section-title">📹 Practice "<span id="currentLetter"></span>"</h2>
-                        <div class="video-container">
-                            <video id="webcamLearn" autoplay playsinline></video>
-                        </div>
-                        <canvas id="canvasLearn"></canvas>
-                        <div class="controls">
-                            <button class="btn-primary" id="startBtnLearn" onclick="startCameraLearn()">Start Camera</button>
-                            <button class="btn-success" id="checkBtn" onclick="checkPractice()" disabled>Check My Sign</button>
-                        </div>
-                    </div>
-
-                    <!-- Lesson Info Section -->
-                    <div class="result-section">
-                        <h2 class="section-title">📖 How to Sign "<span id="currentLetter2"></span>"</h2>
-                        <div class="lesson-card">
-                            <h3>Description</h3>
-                            <p id="description"></p>
-
-                            <h3 style="margin-top: 20px;">Tips</h3>
-                            <ul id="tips"></ul>
-
-                            <h3 style="margin-top: 20px;">Common Mistakes</h3>
-                            <ul id="mistakes"></ul>
-                        </div>
-
-                        <div id="feedbackArea"></div>
-                    </div>
+        <!-- Results -->
+        <div class="panel">
+            <div class="panel-title">🎯 Recognition</div>
+            <div id="hand-status-s2t" class="hand-status missing">✋ No hand detected</div>
+            <div class="predicted-letter" id="letter-s2t">—</div>
+            <div class="conf-label">Confidence</div>
+            <div class="conf-bar"><div class="conf-fill" id="conf-fill-s2t" style="width:0%">0%</div></div>
+            <div class="top3" id="top3-s2t"></div>
+            <div class="text-output-section">
+                <div class="text-output-label">Output (editable)</div>
+                <div class="text-output" id="text-output-s2t" contenteditable="true" spellcheck="false"></div>
+                <div class="text-actions">
+                    <button class="btn btn-ghost" onclick="clearText('s2t')" style="font-size:.78em">✕ Clear</button>
+                    <button class="btn btn-eleven" onclick="elevenSpeak('s2t')" style="font-size:.78em">🔊 ElevenLabs</button>
+                    <button class="btn btn-ghost" onclick="browserSpeak('s2t')" style="font-size:.78em">🗣 Browser TTS</button>
+                    <button class="btn btn-ghost" onclick="copyText('s2t')" style="font-size:.78em">📋 Copy</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        const API_URL = 'http://localhost:8000';
-        let stream = null;
-        let streamLearn = null;
-        let autoMode = false;
-        let sentenceMode = false;
-        let autoInterval = null;
-        let sessionId = 'user_' + Date.now();
-        let currentLetter = null;
-        let currentMode = 'prediction';
+    <!-- Sentence strip -->
+    <div class="sentence-strip" id="sentence-strip-s2t">
+        <div class="sentence-label">Sentence Builder</div>
+        <div class="sentence-text" id="sentence-s2t"></div>
+        <div class="sentence-actions">
+            <button class="btn btn-ghost" onclick="clearSentence('s2t')">✕ Clear</button>
+            <button class="btn btn-eleven" onclick="elevenSpeakSentence('s2t')">🔊 Speak via ElevenLabs</button>
+            <button class="btn btn-ghost" onclick="browserSpeakSentence('s2t')">🗣 Browser TTS</button>
+        </div>
+    </div>
 
-        // Initialize
-        async function init() {
-            try {
-                const response = await fetch(`${API_URL}/health`);
-                const data = await response.json();
+    <div class="panel" style="margin-top:0">
+        <div class="panel-title">🔤 Supported Signs</div>
+        <div class="alpha-grid" id="alpha-ref"></div>
+    </div>
+</div>
 
-                if (data.model_loaded) {
-                    updateStatus('✅ API connected! Click "Start Camera" to begin recognition', 'success');
-                    document.getElementById('startBtn').disabled = false;
-                    loadAlphabet();
-                } else {
-                    updateStatus('API connected but model not loaded. Please train the model first.', 'error');
-                }
-            } catch (error) {
-                updateStatus('❌ Cannot connect to API. Make sure backend is running: python backend/api/main.py', 'error');
-            }
-        }
+<!-- ═══════════ SIGN-TO-SPEECH ═══════════ -->
+<div id="mode-s2speech" class="mode">
+    <div class="lang-bar">
+        <label>Sign Language:</label>
+        <select id="s2sp-input-lang" onchange="onLangChange('s2sp')">
+            <option value="ASL">🇺🇸 ASL</option>
+            <option value="BSL">🇬🇧 BSL</option>
+            <option value="ISL">🇮🇳 ISL</option>
+        </select>
+        <span class="lang-arrow">→</span>
+        <label>Speak in:</label>
+        <select id="s2sp-voice-lang">
+            <option value="en">English</option>
+            <option value="en-gb">English (British)</option>
+            <option value="hi">Hindi</option>
+            <option value="fr">French</option>
+        </select>
+        <span class="lang-note">Signs are spoken aloud via ElevenLabs AI voice</span>
+    </div>
 
-        // Switch between modes
-        function switchMode(mode) {
-            currentMode = mode;
+    <div class="grid2">
+        <!-- Camera -->
+        <div class="panel" style="position:relative">
+            <div class="panel-title">📹 Camera — Sign a Letter or Word</div>
+            <div class="speaking-badge" id="speaking-badge-s2sp">🔊 Speaking…</div>
+            <div class="video-wrap">
+                <video id="video-s2sp" autoplay playsinline muted></video>
+                <div class="hand-guide" id="guide-s2sp" style="display:none"></div>
+                <div class="cam-off" id="cam-s2sp-off"><div class="cam-off-icon">📷</div><div>Camera off</div></div>
+            </div>
+            <canvas id="canvas-s2sp" style="display:none"></canvas>
+            <div id="hand-status-s2sp" class="hand-status missing" style="margin-top:10px">✋ No hand detected</div>
+            <div class="controls">
+                <button class="btn btn-primary" id="btn-start-s2sp" onclick="startCamera('s2sp')">▶ Start Camera</button>
+                <button class="btn btn-ghost" id="btn-auto-s2sp" onclick="toggleAuto('s2sp')" disabled>🔄 Auto: OFF</button>
+                <button class="btn btn-ghost" id="btn-sentence-s2sp" onclick="toggleSentence('s2sp')" disabled>💬 Build Word: OFF</button>
+            </div>
+        </div>
 
-            // Update button states
-            const buttons = document.querySelectorAll('.mode-btn');
-            buttons.forEach((btn, idx) => {
-                btn.classList.remove('active');
-                if ((mode === 'prediction' && idx === 0) || (mode === 'learning' && idx === 1)) {
-                    btn.classList.add('active');
-                }
-            });
+        <!-- Live feed + speak panel -->
+        <div class="panel">
+            <div class="panel-title">🔊 Sign → Speech Output</div>
+            <div style="text-align:center; padding:20px 0 14px">
+                <div style="font-size:5em; font-weight:900; color:var(--primary); min-height:90px;" id="letter-s2sp">—</div>
+                <div style="font-size:.85em; color:var(--text-muted); margin-top:4px" id="s2sp-conf">Confidence: —</div>
+            </div>
+            <div class="conf-bar"><div class="conf-fill" id="conf-fill-s2sp" style="width:0%">0%</div></div>
 
-            // Show/hide sections
-            document.getElementById('predictionMode').classList.remove('active');
-            document.getElementById('learningMode').classList.remove('active');
-
-            if (mode === 'prediction') {
-                document.getElementById('predictionMode').classList.add('active');
-                updateStatus('🎯 Prediction Mode: Show signs for real-time recognition', 'info');
-            } else if (mode === 'learning') {
-                document.getElementById('learningMode').classList.add('active');
-                updateStatus('📚 Learning Mode: Choose a letter to learn and practice', 'info');
-            }
-
-            // Stop cameras when switching
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('captureBtn').disabled = true;
-                document.getElementById('autoBtn').disabled = true;
-                document.getElementById('sentenceBtn').disabled = true;
-            }
-            if (streamLearn) {
-                streamLearn.getTracks().forEach(track => track.stop());
-                streamLearn = null;
-                if (document.getElementById('startBtnLearn')) {
-                    document.getElementById('startBtnLearn').disabled = false;
-                }
-                if (document.getElementById('checkBtn')) {
-                    document.getElementById('checkBtn').disabled = true;
-                }
-            }
-        }
-
-        async function loadAlphabet() {
-            try {
-                const response = await fetch(`${API_URL}/classes`);
-                const data = await response.json();
-
-                // For prediction mode (small reference)
-                const alphabetDiv = document.getElementById('alphabetRef');
-                alphabetDiv.innerHTML = '';
-                data.classes.forEach(letter => {
-                    const div = document.createElement('div');
-                    div.className = 'alphabet-letter-small';
-                    div.textContent = letter;
-                    alphabetDiv.appendChild(div);
-                });
-
-                // For learning mode (clickable grid)
-                const gridDiv = document.getElementById('alphabetGrid');
-                gridDiv.innerHTML = '';
-                data.classes.forEach(letter => {
-                    const div = document.createElement('div');
-                    div.className = 'alphabet-letter';
-                    div.textContent = letter;
-                    div.onclick = () => loadLesson(letter);
-                    gridDiv.appendChild(div);
-                });
-            } catch (error) {
-                console.error('Error loading alphabet:', error);
-            }
-        }
-
-        // PREDICTION MODE FUNCTIONS
-
-        async function startWebcam() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 }
-                });
-
-                const video = document.getElementById('webcam');
-                video.srcObject = stream;
-
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('captureBtn').disabled = false;
-                document.getElementById('autoBtn').disabled = false;
-                document.getElementById('sentenceBtn').disabled = false;
-
-                updateStatus('✅ Camera started! Show an ASL sign and click "Predict Sign"', 'success');
-            } catch (error) {
-                updateStatus('❌ Error accessing camera: ' + error.message, 'error');
-            }
-        }
-
-        async function captureAndPredict() {
-            const video = document.getElementById('webcam');
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-
-            canvas.toBlob(async (blob) => {
-                await predictSign(blob);
-            }, 'image/jpeg');
-        }
-
-        async function predictSign(imageBlob) {
-            updateStatus('🔮 Predicting...', 'info');
-
-            try {
-                const formData = new FormData();
-                formData.append('file', imageBlob, 'capture.jpg');
-
-                const endpoint = sentenceMode ?
-                    `${API_URL}/predict_sentence?session_id=${sessionId}` :
-                    `${API_URL}/predict`;
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    displayPrediction(data);
-
-                    if (sentenceMode && data.sentence) {
-                        document.getElementById('sentenceText').textContent = data.sentence;
-                    }
-
-                    updateStatus('✅ Prediction complete!', 'success');
-                } else {
-                    const error = await response.json();
-                    updateStatus('❌ Prediction error: ' + error.detail, 'error');
-                }
-            } catch (error) {
-                updateStatus('❌ Error: ' + error.message, 'error');
-            }
-        }
-
-        function displayPrediction(data) {
-            const prediction = data.letter || data.prediction;
-            const confidence = data.confidence;
-            const top3 = data.top_3;
-
-            document.getElementById('predictedSign').textContent = prediction;
-
-            const confidencePercent = (confidence * 100).toFixed(1);
-            document.getElementById('confidenceText').textContent = `Confidence: ${confidencePercent}%`;
-            document.getElementById('confidenceFill').style.width = confidencePercent + '%';
-            document.getElementById('confidenceFill').textContent = confidencePercent + '%';
-
-            const topDiv = document.getElementById('topPredictions');
-            topDiv.innerHTML = '<strong>Top 3 Predictions:</strong>';
-
-            top3.forEach((pred, index) => {
-                const item = document.createElement('div');
-                item.className = 'top-pred-item';
-                item.innerHTML = `
-                    <span>${index + 1}. ${pred.class}</span>
-                    <span>${(pred.confidence * 100).toFixed(1)}%</span>
-                `;
-                topDiv.appendChild(item);
-            });
-        }
-
-        function toggleAuto() {
-            autoMode = !autoMode;
-            const btn = document.getElementById('autoBtn');
-
-            if (autoMode) {
-                btn.textContent = 'Auto Mode: ON';
-                btn.classList.remove('btn-secondary');
-                btn.classList.add('btn-primary');
-                document.getElementById('captureBtn').disabled = true;
-
-                autoInterval = setInterval(captureAndPredict, 2000);
-                updateStatus('🔄 Auto mode enabled! Predicting every 2 seconds', 'info');
-            } else {
-                btn.textContent = 'Auto Mode: OFF';
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-secondary');
-                document.getElementById('captureBtn').disabled = false;
-
-                if (autoInterval) {
-                    clearInterval(autoInterval);
-                }
-                updateStatus('✅ Auto mode disabled', 'info');
-            }
-        }
-
-        function toggleSentenceMode() {
-            sentenceMode = !sentenceMode;
-            const btn = document.getElementById('sentenceBtn');
-            const section = document.getElementById('sentenceSection');
-
-            if (sentenceMode) {
-                btn.textContent = 'Sentence Mode: ON';
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-primary');
-                section.style.display = 'block';
-                updateStatus('💬 Sentence mode ON! Signs will be buffered into words', 'info');
-            } else {
-                btn.textContent = 'Sentence Mode: OFF';
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-success');
-                section.style.display = 'none';
-                clearSentence();
-                updateStatus('✅ Sentence mode disabled', 'info');
-            }
-        }
-
-        async function clearSentence() {
-            try {
-                await fetch(`${API_URL}/clear_sentence/${sessionId}`, { method: 'POST' });
-                document.getElementById('sentenceText').textContent = '';
-            } catch (error) {
-                console.error('Error clearing sentence:', error);
-            }
-        }
-
-        function speakSentence() {
-            const text = document.getElementById('sentenceText').textContent;
-            if (text) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                window.speechSynthesis.speak(utterance);
-            } else {
-                updateStatus('❌ No sentence to speak', 'error');
-            }
-        }
-
-        // LEARNING MODE FUNCTIONS
-
-        async function loadLesson(letter) {
-            currentLetter = letter;
-            document.getElementById('currentLetter').textContent = letter;
-            document.getElementById('currentLetter2').textContent = letter;
-
-            try {
-                const response = await fetch(`${API_URL}/learn/${letter}`);
-                const lesson = await response.json();
-
-                document.getElementById('description').textContent = lesson.description;
-
-                const tipsList = document.getElementById('tips');
-                tipsList.innerHTML = '';
-                lesson.tips.forEach(tip => {
-                    const li = document.createElement('li');
-                    li.textContent = tip;
-                    tipsList.appendChild(li);
-                });
-
-                const mistakesList = document.getElementById('mistakes');
-                mistakesList.innerHTML = '';
-                lesson.common_mistakes.forEach(mistake => {
-                    const li = document.createElement('li');
-                    li.textContent = mistake;
-                    mistakesList.appendChild(li);
-                });
-
-                document.getElementById('letterSelection').style.display = 'none';
-                document.getElementById('lessonContent').style.display = 'block';
-                document.getElementById('feedbackArea').innerHTML = '';
-
-                updateStatus(`📖 Learning "${letter}". Read instructions then click "Start Camera" to practice.`, 'info');
-            } catch (error) {
-                console.error('Error loading lesson:', error);
-                updateStatus('❌ Error loading lesson', 'error');
-            }
-        }
-
-        function backToSelection() {
-            document.getElementById('letterSelection').style.display = 'block';
-            document.getElementById('lessonContent').style.display = 'none';
-            currentLetter = null;
-
-            if (streamLearn) {
-                streamLearn.getTracks().forEach(track => track.stop());
-                streamLearn = null;
-            }
-
-            document.getElementById('startBtnLearn').disabled = false;
-            document.getElementById('checkBtn').disabled = true;
-            document.getElementById('feedbackArea').innerHTML = '';
-
-            updateStatus('📚 Choose a letter to learn', 'info');
-        }
-
-        async function startCameraLearn() {
-            try {
-                streamLearn = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 }
-                });
-
-                const video = document.getElementById('webcamLearn');
-                video.srcObject = streamLearn;
-
-                document.getElementById('startBtnLearn').disabled = true;
-                document.getElementById('checkBtn').disabled = false;
-
-                updateStatus(`✅ Camera started! Show "${currentLetter}" and click "Check My Sign"`, 'success');
-            } catch (error) {
-                updateStatus('❌ Error accessing camera: ' + error.message, 'error');
-            }
-        }
-
-        async function checkPractice() {
-            const video = document.getElementById('webcamLearn');
-            const canvas = document.getElementById('canvasLearn');
-            const ctx = canvas.getContext('2d');
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-
-            updateStatus('🔮 Checking your sign...', 'info');
-
-            canvas.toBlob(async (blob) => {
-                try {
-                    const formData = new FormData();
-                    formData.append('file', blob, 'practice.jpg');
-
-                    const response = await fetch(`${API_URL}/practice/${currentLetter}`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const feedback = await response.json();
-                        displayFeedback(feedback);
-                        updateStatus('✅ Feedback ready!', 'success');
-                    } else {
-                        const error = await response.json();
-                        updateStatus('❌ Error: ' + error.detail, 'error');
-                    }
-                } catch (error) {
-                    updateStatus('❌ Error: ' + error.message, 'error');
-                }
-            }, 'image/jpeg');
-        }
-
-        function displayFeedback(feedback) {
-            const feedbackArea = document.getElementById('feedbackArea');
-            const className = feedback.correct ? 'feedback-correct' : 'feedback-incorrect';
-            const emoji = feedback.correct ? '✅' : '❌';
-
-            let top3HTML = '<div style="margin-top: 15px;"><strong>What the model saw:</strong><ul style="list-style: none; padding: 0; margin-top: 10px;">';
-            feedback.top_3.forEach((pred, idx) => {
-                top3HTML += `<li style="padding: 5px 0;">${idx + 1}. ${pred.class} - ${(pred.confidence * 100).toFixed(1)}%</li>`;
-            });
-            top3HTML += '</ul></div>';
-
-            feedbackArea.innerHTML = `
-                <div class="practice-feedback ${className}">
-                    <h3>${emoji} ${feedback.feedback_message}</h3>
-                    <p style="font-size: 1.1em; margin: 10px 0;">
-                        <strong>You showed:</strong> ${feedback.your_sign}
-                        <strong>(${(feedback.confidence * 100).toFixed(1)}% confident)</strong>
-                    </p>
-                    <p style="font-size: 1.1em;">
-                        <strong>Target:</strong> ${feedback.target}
-                    </p>
-                    ${top3HTML}
+            <!-- Built word -->
+            <div class="sentence-strip show" id="sentence-strip-s2sp" style="margin-top:14px">
+                <div class="sentence-label">Built Word / Sentence</div>
+                <div class="sentence-text" id="sentence-s2sp" style="letter-spacing:3px; min-height:40px"></div>
+                <div class="sentence-actions">
+                    <button class="btn btn-ghost" onclick="clearSentence('s2sp')">✕ Clear</button>
+                    <button class="btn btn-eleven" id="btn-speak-s2sp" onclick="elevenSpeakSentence('s2sp')">🔊 Speak via ElevenLabs</button>
+                    <button class="btn btn-ghost" onclick="browserSpeakSentence('s2sp')">🗣 Browser</button>
                 </div>
-            `;
+            </div>
+
+            <!-- Auto-speak toggle -->
+            <div style="margin-top:14px; display:flex; align-items:center; gap:10px;">
+                <label style="font-size:.84em; color:var(--text-muted)">Auto-speak each letter:</label>
+                <button class="btn btn-ghost" id="btn-autospeak" onclick="toggleAutoSpeak()" style="font-size:.8em">🔕 OFF</button>
+            </div>
+            <div style="margin-top:8px; font-size:.78em; color:var(--text-muted)">
+                Tip: Build a word letter by letter, then tap Speak to hear the full word.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ SPEECH-TO-TEXT ═══════════ -->
+<div id="mode-stt" class="mode">
+    <div class="lang-bar">
+        <label>Speak in:</label>
+        <select id="stt-input-lang">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="hi-IN">Hindi</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+            <option value="es-ES">Spanish</option>
+        </select>
+        <span class="lang-arrow">→</span>
+        <label>Show as text for:</label>
+        <select id="stt-target-lang">
+            <option value="ASL">ASL Signer</option>
+            <option value="BSL">BSL Signer</option>
+            <option value="ISL">ISL Signer</option>
+        </select>
+        <span class="lang-note">Uses browser Web Speech API — no account needed</span>
+    </div>
+
+    <div class="grid2">
+        <div class="panel">
+            <div class="panel-title">🎤 Voice Input</div>
+            <div style="text-align:center; padding:30px 20px;">
+                <div id="stt-mic-icon" style="font-size:4em; margin-bottom:12px; cursor:pointer;" onclick="toggleSTT()">🎤</div>
+                <div id="stt-status-text" style="font-size:.9em; color:var(--text-muted); margin-bottom:20px;">Click to start listening</div>
+                <button class="btn btn-speech" id="btn-stt" onclick="toggleSTT()" style="font-size:1em; padding:12px 28px;">
+                    <span class="mic-pulse" id="mic-pulse"></span>&nbsp;Start Listening
+                </button>
+            </div>
+            <div class="stt-section">
+                <div class="stt-title">
+                    <span class="mic-pulse" id="mic-pulse2"></span>
+                    Live Transcript
+                </div>
+                <div class="stt-transcript" id="stt-live-transcript"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">💬 Final Transcript — Display for Deaf User</div>
+            <div class="text-output" id="stt-final-output" contenteditable="true" spellcheck="false" style="min-height:120px; font-size:1.15em;"></div>
+            <div class="text-actions" style="margin-top:8px;">
+                <button class="btn btn-ghost" onclick="document.getElementById('stt-final-output').textContent=''" style="font-size:.78em">✕ Clear</button>
+                <button class="btn btn-eleven" onclick="elevenSpeakEl('stt-final-output','stt-voice-lang')" style="font-size:.78em">🔊 ElevenLabs</button>
+                <button class="btn btn-ghost" onclick="copyEl('stt-final-output')" style="font-size:.78em">📋 Copy</button>
+                <button class="btn btn-ghost" onclick="enlargeText()" style="font-size:.78em">🔍 Large Font</button>
+            </div>
+            <div style="margin-top:14px; background:var(--surface2); border-radius:8px; padding:12px; font-size:.82em; color:var(--text-muted); line-height:1.7;">
+                <strong style="color:var(--text)">How to use:</strong><br>
+                1. Click "Start Listening" — speak in the chosen language<br>
+                2. The transcript is shown for the Deaf user to read<br>
+                3. Tap ElevenLabs to play back the speech with an AI voice
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ SIGN-TO-SIGN ═══════════ -->
+<div id="mode-s2s" class="mode">
+    <div class="lang-bar">
+        <label>Input:</label>
+        <select id="s2s-input-lang" onchange="onLangChange('s2s-in')">
+            <option value="ASL">🇺🇸 ASL</option>
+            <option value="BSL">🇬🇧 BSL</option>
+            <option value="ISL">🇮🇳 ISL</option>
+        </select>
+        <span class="lang-arrow">→</span>
+        <label>Avatar Output:</label>
+        <select id="s2s-output-lang" onchange="onS2SOutChange()">
+            <option value="BSL">🇬🇧 BSL</option>
+            <option value="ASL">🇺🇸 ASL</option>
+            <option value="ISL">🇮🇳 ISL</option>
+        </select>
+        <button class="btn btn-ghost" onclick="swapS2SLanguages()" style="font-size:.8em">⇄ Swap</button>
+        <span class="lang-note">Avatar renders target-language handshape</span>
+    </div>
+
+    <div class="grid2">
+        <div class="panel">
+            <div class="user-header">
+                <div class="panel-title">📹 Input (You Sign)</div>
+                <span class="badge badge-input" id="s2s-input-badge">ASL</span>
+            </div>
+            <div class="video-wrap">
+                <video id="video-s2s" autoplay playsinline muted></video>
+                <div class="hand-guide" id="guide-s2s" style="display:none"></div>
+                <div class="cam-off" id="cam-s2s-off"><div class="cam-off-icon">📷</div><div>Camera off</div></div>
+            </div>
+            <canvas id="canvas-s2s" style="display:none"></canvas>
+            <div class="s2s-info">
+                <div class="sign-detected">Detected: <span id="s2s-detected">—</span></div>
+                <div class="conf-bar"><div class="conf-fill" id="conf-fill-s2s" style="width:0%">0%</div></div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" id="btn-start-s2s" onclick="startCamera('s2s')">▶ Start Camera</button>
+                <button class="btn btn-ghost" id="btn-auto-s2s" onclick="toggleAuto('s2s')" disabled>🔄 Auto: OFF</button>
+            </div>
+        </div>
+
+        <div class="panel" style="position:relative">
+            <div class="user-header">
+                <div class="panel-title">🤖 Avatar (They See)</div>
+                <span class="badge badge-output" id="s2s-output-badge">BSL</span>
+            </div>
+            <div class="playback-badge" id="slow-badge">🐢 Slow</div>
+            <div class="avatar-wrap"><canvas id="avatar-s2s" width="280" height="320"></canvas></div>
+            <div class="controls" style="margin-top:12px">
+                <button class="btn btn-ghost" id="btn-slow-s2s" onclick="toggleSlow('s2s')">🐢 Slow: OFF</button>
+                <button class="btn btn-ghost" id="btn-replay-s2s" onclick="replayAvatar('s2s')" disabled>↺ Replay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ CONVERSATION ═══════════ -->
+<div id="mode-conv" class="mode">
+    <div class="lang-bar">
+        <label>User A signs:</label>
+        <select id="conv-lang-a">
+            <option value="ASL">🇺🇸 ASL</option>
+            <option value="ISL">🇮🇳 ISL</option>
+            <option value="BSL">🇬🇧 BSL</option>
+        </select>
+        <span class="lang-arrow">↔</span>
+        <label>User B signs:</label>
+        <select id="conv-lang-b">
+            <option value="BSL">🇬🇧 BSL</option>
+            <option value="ASL">🇺🇸 ASL</option>
+            <option value="ISL">🇮🇳 ISL</option>
+        </select>
+        <span class="lang-note">Split-screen D2D conversation prototype</span>
+    </div>
+
+    <div class="conv-grid">
+        <div class="user-panel" id="panel-actor">
+            <div class="user-header">
+                <div class="user-title">User A — <span id="conv-a-lang">ASL</span></div>
+                <span class="badge badge-actor" id="badge-actor">ACTOR</span>
+            </div>
+            <div class="video-wrap">
+                <video id="video-conv" autoplay playsinline muted></video>
+                <div class="hand-guide" id="guide-conv" style="display:none"></div>
+                <div class="cam-off" id="cam-conv-off"><div class="cam-off-icon">📷</div><div>Camera off</div></div>
+            </div>
+            <canvas id="canvas-conv" style="display:none"></canvas>
+            <div class="conv-mini-conf"><div class="conv-mini-fill" id="conf-conv-a" style="width:0%"></div></div>
+            <div style="font-size:.84em; margin-top:6px; color:var(--text-muted)">
+                Letter: <strong id="conv-letter-a" style="color:var(--primary)">—</strong>
+                &nbsp;|&nbsp; Word: <strong id="conv-sentence-a" style="color:var(--accent)"></strong>
+            </div>
+            <div class="controls" style="margin-top:10px">
+                <button class="btn btn-primary" id="btn-start-conv" onclick="startCamera('conv')">▶ Start Camera</button>
+                <button class="btn btn-ghost" id="btn-auto-conv" onclick="toggleAuto('conv')" disabled>🔄 Auto: OFF</button>
+                <button class="btn btn-ghost" onclick="clearSentence('conv')">✕ Clear</button>
+                <button class="btn btn-eleven" onclick="elevenSpeakSentenceConv()" style="font-size:.78em">🔊 Speak</button>
+            </div>
+        </div>
+
+        <div class="toggle-col">
+            <div class="toggle-icon">⇄</div>
+            <button class="btn btn-outline" onclick="toggleRole()" style="font-size:.78em; padding:7px 10px">Toggle Role</button>
+            <div class="conv-label">Switch<br>Actor &<br>Receiver</div>
+        </div>
+
+        <div class="user-panel" id="panel-receiver">
+            <div class="user-header">
+                <div class="user-title">User B — <span id="conv-b-lang">BSL</span></div>
+                <span class="badge badge-recv" id="badge-recv">RECEIVER</span>
+            </div>
+            <div class="avatar-wrap"><canvas id="avatar-conv" width="280" height="320"></canvas></div>
+            <div class="conv-mini-conf"><div class="conv-mini-fill" id="conf-conv-b" style="width:0%; background:var(--accent)"></div></div>
+            <div style="font-size:.84em; margin-top:6px; color:var(--text-muted)">
+                Receiving: <strong id="conv-letter-b" style="color:var(--accent)">—</strong>
+                &nbsp;|&nbsp; Word: <strong id="conv-sentence-b" style="color:var(--primary)"></strong>
+            </div>
+            <div class="controls" style="margin-top:10px">
+                <button class="btn btn-ghost" id="btn-slow-conv" onclick="toggleSlow('conv')">🐢 Slow: OFF</button>
+                <button class="btn btn-ghost" id="btn-replay-conv" onclick="replayAvatar('conv')" disabled>↺ Replay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ DATASETS ═══════════ -->
+<div id="mode-datasets" class="mode">
+    <div class="panel" style="margin-bottom:16px">
+        <div class="panel-title">📊 Sign Language Datasets — Status</div>
+        <p style="font-size:.85em; color:var(--text-muted); margin-bottom:16px; line-height:1.6;">
+            SignBridge uses landmark-based models (MediaPipe hand keypoints → MLP classifier),
+            making it robust to lighting and background. Training data currently loaded:
+        </p>
+        <div class="dataset-grid" id="dataset-grid"></div>
+    </div>
+    <div class="panel">
+        <div class="panel-title">🔗 Recommended Public Datasets</div>
+        <p style="font-size:.83em; color:var(--text-muted); margin-bottom:12px; line-height:1.6;">
+            The following publicly available datasets can expand SignBridge to more languages and word-level recognition.
+        </p>
+        <div class="dataset-grid">
+            <div class="ds-chip"><div class="ds-chip-name">WLASL</div><div class="ds-chip-meta">2000 ASL words · 119 subjects · videos</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">RWTH-PHOENIX</div><div class="ds-chip-meta">1200 German sentences · 53 GB</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">LSA64</div><div class="ds-chip-meta">64 Argentine signs · 10 subjects</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">LSFB-ISOL</div><div class="ds-chip-meta">400 Belgian signs · 85 subjects</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">Boston ASLLVD</div><div class="ds-chip-meta">3300+ ASL words · multiple angles</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">PSL Kinect 30</div><div class="ds-chip-meta">30 Polish words · depth video</div><span class="ds-chip-status online">Public</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">SignGemma</div><div class="ds-chip-meta">Google · ASL · Transformer model</div><span class="ds-chip-status online">Kaggle</span></div>
+            <div class="ds-chip"><div class="ds-chip-name">sign.mt</div><div class="ds-chip-meta">Open-source sign translation platform</div><span class="ds-chip-status online">Open</span></div>
+        </div>
+    </div>
+</div>
+
+</main>
+
+<!-- ElevenLabs API Key Modal -->
+<div id="key-modal">
+    <div class="key-box">
+        <h3>🔊 ElevenLabs API Key</h3>
+        <p>Enter your ElevenLabs API key to enable Sign-to-Speech with AI voices.
+           Get a free key at <a href="https://elevenlabs.io" target="_blank" style="color:var(--primary)">elevenlabs.io</a>
+           (10,000 chars/month free).</p>
+        <input class="key-input" id="eleven-key-input" type="password" placeholder="sk_..." />
+        <div class="key-actions">
+            <button class="btn btn-ghost" onclick="hideKeyModal()">Cancel</button>
+            <button class="btn btn-eleven" onclick="saveElevenKey()">Save Key</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+'use strict';
+
+const API = 'http://localhost:8000';
+
+// ── State ─────────────────────────────────────────────────────────
+const state = {
+    streams:     { s2t:null, s2sp:null, s2s:null, conv:null },
+    autoTimers:  { s2t:null, s2sp:null, s2s:null, conv:null },
+    autoOn:      { s2t:false, s2sp:false, s2s:false, conv:false },
+    sentenceOn:  { s2t:false, s2sp:true },
+    slowOn:      { s2s:false, conv:false },
+    sessions:    { s2t:'sess_s2t_'+Date.now(), s2sp:'sess_s2sp_'+Date.now(), conv:'sess_conv_'+Date.now() },
+    lastLetters: { s2s:null, conv:null },
+    roleSwapped: false,
+    autoSpeak:   false,
+    sttRunning:  false,
+    sttRecog:    null,
+    elevenKey:   localStorage.getItem('eleven_api_key') || '',
+    largeFontOn: false,
+};
+
+// ── HAND AVATAR DATA ───────────────────────────────────────────────
+const HAND_SIGNS = {
+    'A':[1.0,1.0,1.0,1.0,'side'],  'B':[0.0,0.0,0.0,0.0,'across'],
+    'C':[0.3,0.3,0.35,0.4,'curve'],'D':[0.0,0.9,0.9,0.9,'out'],
+    'E':[0.7,0.7,0.75,0.8,'across'],'F':[0.9,0.0,0.0,0.0,'touch'],
+    'G':[0.0,1.0,1.0,1.0,'side'],  'H':[0.0,0.0,1.0,1.0,'in'],
+    'I':[1.0,1.0,1.0,0.0,'in'],    'J':[1.0,1.0,1.0,0.0,'in'],
+    'K':[0.0,0.0,1.0,1.0,'v'],     'L':[0.0,1.0,1.0,1.0,'out'],
+    'M':[0.6,0.65,0.7,1.0,'under'],'N':[0.6,0.65,1.0,1.0,'under'],
+    'O':[0.45,0.45,0.5,0.5,'circle'],'P':[0.0,0.0,1.0,1.0,'v'],
+    'Q':[0.0,1.0,1.0,1.0,'out'],   'R':[0.0,0.0,1.0,1.0,'in'],
+    'S':[1.0,1.0,1.0,1.0,'across'],'T':[1.0,1.0,1.0,1.0,'bt'],
+    'U':[0.0,0.0,1.0,1.0,'in'],    'V':[0.0,0.0,1.0,1.0,'in'],
+    'W':[0.0,0.0,0.0,1.0,'in'],    'X':[0.5,1.0,1.0,1.0,'in'],
+    'Y':[1.0,1.0,1.0,0.0,'out'],   'Z':[0.0,1.0,1.0,1.0,'side'],
+};
+const SKIN='#E8C49A', SHADOW='#C89470', JOINT='#A07040', LINE='rgba(30,15,5,0.55)', ACCENT_COL='#667eea';
+
+function drawHandSign(canvas, letter) {
+    const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const bg=ctx.createLinearGradient(0,0,W,H);
+    bg.addColorStop(0,'#0a0a1e'); bg.addColorStop(1,'#12123a');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+    if (!letter || !HAND_SIGNS[letter]) {
+        ctx.fillStyle='rgba(102,126,234,0.35)';
+        ctx.font=`${W*0.22}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('🤟',W/2,H/2-12);
+        ctx.fillStyle='rgba(148,163,184,0.5)'; ctx.font=`${W*0.06}px Segoe UI`;
+        ctx.fillText('Waiting…',W/2,H/2+W*0.12); return;
+    }
+    const [iC,mC,rC,pC,thumb]=HAND_SIGNS[letter];
+    const cx=W*0.47, wy=H-H*0.10;
+    ctx.fillStyle=SKIN; ctx.strokeStyle=LINE; ctx.lineWidth=1;
+    roundRect(ctx,cx-28,wy-14,56,32,8,true,true);
+    roundRect(ctx,cx-36,wy-72,72,60,[5,5,0,0],true,true);
+    const fingers=[
+        {dx:22,dy:-68,ang:-Math.PI/2+0.13,curl:iC,segs:[27,20,15],t:9},
+        {dx:6,dy:-76,ang:-Math.PI/2+0.03,curl:mC,segs:[29,21,16],t:10},
+        {dx:-10,dy:-74,ang:-Math.PI/2-0.05,curl:rC,segs:[27,20,15],t:9},
+        {dx:-24,dy:-66,ang:-Math.PI/2-0.15,curl:pC,segs:[21,16,13],t:8},
+    ];
+    const overrides={
+        'V':(f)=>{if(f===0)fingers[0].ang=-Math.PI/2+0.24;if(f===1)fingers[1].ang=-Math.PI/2-0.06;},
+        'W':(f)=>{if(f===0)fingers[0].ang=-Math.PI/2+0.24;if(f===1)fingers[1].ang=-Math.PI/2+0.06;if(f===2)fingers[2].ang=-Math.PI/2-0.14;},
+        'K':(f)=>{if(f===0)fingers[0].ang=-Math.PI/2+0.16;if(f===1)fingers[1].ang=-Math.PI/2-0.06;},
+        'G':(f)=>{if(f===0)fingers[0].ang=0.08;},
+        'H':(f)=>{if(f===0)fingers[0].ang=0.08;if(f===1)fingers[1].ang=0.08;},
+        'P':(f)=>{if(f===0)fingers[0].ang=Math.PI/2-0.14;if(f===1)fingers[1].ang=Math.PI/2-0.05;},
+        'Q':(f)=>{if(f===0)fingers[0].ang=Math.PI/2-0.10;},
+    };
+    fingers.forEach((fd,fi)=>{if(overrides[letter])overrides[letter](fi);drawFinger(ctx,cx+fd.dx,wy+fd.dy,fd.ang,fd.curl,fd.segs,fd.t);});
+    drawThumb(ctx,cx,wy,thumb,letter);
+    ctx.fillStyle=ACCENT_COL; ctx.font=`bold ${W*0.09}px Segoe UI,Arial`;
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText(letter,W/2,H-8);
+}
+
+function drawFinger(ctx,bx,by,baseAng,curl,segs,thick) {
+    const bends=[curl*Math.PI*0.65,curl*Math.PI*0.55,curl*Math.PI*0.40];
+    let x=bx,y=by,ang=baseAng;
+    for(let i=0;i<3;i++){
+        ang+=bends[i]; const len=segs[i], nx=x+Math.cos(ang)*len, ny=y+Math.sin(ang)*len, t=Math.max(4,thick-i*1.3);
+        ctx.lineCap='round'; ctx.lineWidth=t; ctx.strokeStyle=SKIN;
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(nx,ny); ctx.stroke();
+        ctx.lineWidth=0.6; ctx.strokeStyle=LINE;
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(nx,ny); ctx.stroke();
+        ctx.fillStyle=JOINT; ctx.beginPath(); ctx.arc(nx,ny,t/2.8,0,Math.PI*2); ctx.fill();
+        x=nx; y=ny;
+    }
+}
+
+function drawThumb(ctx,cx,wy,tstate) {
+    const tbx=cx+34,tby=wy-48;
+    let p1,p2;
+    const cases={'side':[[cx+38,wy-66],[cx+40,wy-82]],'across':[[cx+20,wy-56],[cx+3,wy-60]],'out':[[cx+50,wy-40],[cx+64,wy-34]],'in':[[cx+32,wy-62],[cx+28,wy-74]],'curve':[[cx+44,wy-50],[cx+48,wy-64]],'circle':[[cx+42,wy-54],[cx+38,wy-68]],'touch':[[cx+40,wy-60],[cx+34,wy-76]],'v':[[cx+38,wy-58],[cx+28,wy-70]],'under':[[cx+18,wy-54],[cx+6,wy-58]],'bt':[[cx+26,wy-58],[cx+20,wy-70]]};
+    [p1,p2]=(cases[tstate]||cases['in']);
+    for(const[from,to,t]of[[{x:tbx,y:tby},{x:p1[0],y:p1[1]},12],[{x:p1[0],y:p1[1]},{x:p2[0],y:p2[1]},10]]){
+        ctx.lineWidth=t; ctx.strokeStyle=SKIN; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(from.x,from.y); ctx.lineTo(to.x,to.y); ctx.stroke();
+        ctx.lineWidth=0.6; ctx.strokeStyle=LINE;
+        ctx.beginPath(); ctx.moveTo(from.x,from.y); ctx.lineTo(to.x,to.y); ctx.stroke();
+    }
+    ctx.fillStyle=JOINT; ctx.beginPath(); ctx.arc(p1[0],p1[1],4.5,0,Math.PI*2); ctx.fill();
+}
+
+function roundRect(ctx,x,y,w,h,r,fill,stroke){
+    if(typeof r==='number')r=[r,r,r,r];
+    ctx.beginPath();
+    ctx.moveTo(x+r[0],y); ctx.lineTo(x+w-r[1],y); ctx.arcTo(x+w,y,x+w,y+r[1],r[1]);
+    ctx.lineTo(x+w,y+h-r[2]); ctx.arcTo(x+w,y+h,x+w-r[2],y+h,r[2]);
+    ctx.lineTo(x+r[3],y+h); ctx.arcTo(x,y+h,x,y+h-r[3],r[3]);
+    ctx.lineTo(x,y+r[0]); ctx.arcTo(x,y,x+r[0],y,r[0]);
+    ctx.closePath();
+    ctx.fillStyle=SKIN; ctx.strokeStyle=LINE; ctx.lineWidth=1;
+    if(fill)ctx.fill(); if(stroke)ctx.stroke();
+}
+
+function animateAvatar(canvasId,letter,slowMode){
+    const canvas=document.getElementById(canvasId); if(!canvas)return;
+    drawHandSign(canvas,null);
+    setTimeout(()=>drawHandSign(canvas,letter),slowMode?600:80);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async()=>{
+    drawHandSign(document.getElementById('avatar-s2s'),null);
+    drawHandSign(document.getElementById('avatar-conv'),null);
+    loadDatasetGrid();
+    updateElevenStatus();
+    // Pre-fill key input if saved
+    if(state.elevenKey) document.getElementById('eleven-key-input').value=state.elevenKey;
+    try {
+        const r=await fetch(`${API}/health`);
+        const d=await r.json();
+        const nModels=d.models_loaded?.length||0;
+        if(nModels>0){
+            setStatus(true,`Ready · models: ${d.models_loaded.join(', ')}`);
+            await loadAlphabet();
+        } else {
+            setStatus(false,'No models — run: python scripts/training/extract_and_train_landmarks.py');
         }
+    } catch(e){ setStatus(null,'Backend offline — run: python backend/api/main.py'); }
+});
 
-        // COMMON FUNCTIONS
+function setStatus(ok,msg){
+    const dot=document.getElementById('dot');
+    dot.className='dot'+(ok===true?' ok':ok===false?' err':'');
+    document.getElementById('status-text').textContent=msg;
+}
 
-        function updateStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + type;
+async function loadAlphabet(){
+    try {
+        const lang=(document.getElementById('s2t-input-lang')||{}).value||'ASL';
+        const r=await fetch(`${API}/classes?lang=${lang}`);
+        const d=await r.json();
+        const grid=document.getElementById('alpha-ref');
+        if(grid) grid.innerHTML=d.classes.map(l=>`<div class="alpha-chip">${l}</div>`).join('');
+    } catch(_){}
+}
+
+function loadDatasetGrid(){
+    const g=document.getElementById('dataset-grid'); if(!g)return;
+    const datasets=[
+        {name:'ASL custom_original',meta:'a-z + 0-9 · ~70 imgs/class',status:'local'},
+        {name:'ISL numbers_and_letters',meta:'A-Z + 0-9 · ~1200 imgs/class',status:'local'},
+        {name:'ISL custom',meta:'A-Z · ~550 imgs/class',status:'local'},
+        {name:'BSL',meta:'No data yet — falls back to ASL',status:'local'},
+    ];
+    g.innerHTML=datasets.map(d=>`
+        <div class="ds-chip">
+            <div class="ds-chip-name">${d.name}</div>
+            <div class="ds-chip-meta">${d.meta}</div>
+            <span class="ds-chip-status ${d.status}">${d.status==='local'?'Local':'Online'}</span>
+        </div>`).join('');
+}
+
+// ── MODE SWITCHING ─────────────────────────────────────────────────
+function switchMode(mode){
+    document.querySelectorAll('.mode').forEach(el=>el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+    document.getElementById(`mode-${mode}`).classList.add('active');
+    const idx={s2t:0,s2speech:1,stt:2,s2s:3,conv:4,datasets:5}[mode];
+    document.querySelectorAll('.tab')[idx].classList.add('active');
+    Object.keys(state.streams).forEach(k=>stopCamera(k));
+    if(mode==='stt') stopSTT();
+}
+
+// ── ELEVENLABS KEY MODAL ──────────────────────────────────────────
+function showKeyModal(){ document.getElementById('key-modal').classList.add('show'); }
+function hideKeyModal(){ document.getElementById('key-modal').classList.remove('show'); }
+function saveElevenKey(){
+    const k=document.getElementById('eleven-key-input').value.trim();
+    state.elevenKey=k;
+    localStorage.setItem('eleven_api_key',k);
+    updateElevenStatus();
+    hideKeyModal();
+    // Send to backend
+    fetch(`${API}/tts/status`).then(r=>r.json()).then(d=>{
+        toast(k?'🔊 ElevenLabs key saved':'🔕 ElevenLabs key cleared');
+    });
+}
+function updateElevenStatus(){
+    const el=document.getElementById('eleven-status');
+    if(state.elevenKey){
+        el.textContent='🔊 ElevenLabs: ✓';
+        el.classList.add('ok');
+    } else {
+        el.textContent='🔊 ElevenLabs: not set';
+        el.classList.remove('ok');
+    }
+}
+
+// ── CAMERA ────────────────────────────────────────────────────────
+const CAM_IDS={
+    s2t:  {video:'video-s2t',  camOff:'cam-s2t-off',  guide:'guide-s2t'},
+    s2sp: {video:'video-s2sp', camOff:'cam-s2sp-off', guide:'guide-s2sp'},
+    s2s:  {video:'video-s2s',  camOff:'cam-s2s-off',  guide:'guide-s2s'},
+    conv: {video:'video-conv', camOff:'cam-conv-off', guide:'guide-conv'},
+};
+
+async function startCamera(key){
+    const ids=CAM_IDS[key];
+    try {
+        const stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}});
+        state.streams[key]=stream;
+        const video=document.getElementById(ids.video);
+        video.srcObject=stream;
+        document.getElementById(ids.camOff).style.display='none';
+        document.getElementById(ids.guide).style.display='block';
+        const startBtn=document.getElementById(`btn-start-${key}`);
+        if(startBtn) startBtn.disabled=true;
+        const autoBtn=document.getElementById(`btn-auto-${key}`);
+        if(autoBtn) autoBtn.disabled=false;
+        if(key==='s2t'){
+            document.getElementById('btn-capture-s2t').disabled=false;
+            document.getElementById('btn-sentence-s2t').disabled=false;
         }
+        if(key==='s2sp'){
+            document.getElementById('btn-sentence-s2sp').disabled=false;
+        }
+        if(key==='s2s') document.getElementById('btn-replay-s2s').disabled=false;
+        if(key==='conv') document.getElementById('btn-replay-conv').disabled=false;
+        toast('📷 Camera started');
+    } catch(err){ toast(`❌ Camera: ${err.message}`); }
+}
 
-        window.onload = init;
-    </script>
+function stopCamera(key){
+    if(state.streams[key]){state.streams[key].getTracks().forEach(t=>t.stop()); state.streams[key]=null;}
+    if(state.autoTimers[key]){clearInterval(state.autoTimers[key]); state.autoTimers[key]=null;}
+    state.autoOn[key]=false;
+    const btn=document.getElementById(`btn-auto-${key}`);
+    if(btn){btn.textContent='🔄 Auto: OFF'; btn.classList.remove('active');}
+    const startBtn=document.getElementById(`btn-start-${key}`);
+    if(startBtn) startBtn.disabled=false;
+    const ids=CAM_IDS[key];
+    if(ids){
+        document.getElementById(ids.camOff).style.display='';
+        document.getElementById(ids.guide).style.display='none';
+    }
+}
+
+// ── CAPTURE ───────────────────────────────────────────────────────
+const CANVAS_IDS={ s2t:'canvas-s2t', s2sp:'canvas-s2sp', s2s:'canvas-s2s', conv:'canvas-conv' };
+
+function captureFrame(key){
+    const video=document.getElementById(CAM_IDS[key].video);
+    const canvas=document.getElementById(CANVAS_IDS[key]);
+    if(!video||!video.srcObject)return null;
+    canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;
+    canvas.getContext('2d').drawImage(video,0,0);
+    return new Promise(res=>canvas.toBlob(res,'image/jpeg',0.88));
+}
+
+function captureOnce(key){ captureFrame(key).then(blob=>{if(blob)sendPrediction(key,blob);}); }
+
+function toggleAuto(key){
+    state.autoOn[key]=!state.autoOn[key];
+    const btn=document.getElementById(`btn-auto-${key}`);
+    if(state.autoOn[key]){
+        btn.textContent='🔄 Auto: ON'; btn.classList.add('active');
+        const interval=state.slowOn[key]?2800:1200;
+        state.autoTimers[key]=setInterval(()=>captureOnce(key),interval);
+        if(key==='s2t') document.getElementById('btn-capture-s2t').disabled=true;
+    } else {
+        btn.textContent='🔄 Auto: OFF'; btn.classList.remove('active');
+        clearInterval(state.autoTimers[key]); state.autoTimers[key]=null;
+        if(key==='s2t') document.getElementById('btn-capture-s2t').disabled=false;
+    }
+}
+
+function toggleSentence(key){
+    state.sentenceOn[key]=!state.sentenceOn[key];
+    const btn=document.getElementById(`btn-sentence-${key}`);
+    if(state.sentenceOn[key]){
+        btn.textContent='💬 Sentence: ON'; btn.classList.add('active');
+        const strip=document.getElementById(`sentence-strip-${key}`);
+        if(strip) strip.classList.add('show');
+    } else {
+        btn.textContent='💬 Sentence: OFF'; btn.classList.remove('active');
+        const strip=document.getElementById(`sentence-strip-${key}`);
+        if(strip) strip.classList.remove('show');
+        clearSentence(key);
+    }
+}
+
+function toggleSlow(key){
+    state.slowOn[key]=!state.slowOn[key];
+    const btn=document.getElementById(`btn-slow-${key}`);
+    if(state.slowOn[key]){btn.textContent='🐢 Slow: ON'; btn.classList.add('active');}
+    else{btn.textContent='🐢 Slow: OFF'; btn.classList.remove('active');}
+    if(key==='s2s'){
+        const badge=document.getElementById('slow-badge');
+        if(badge) badge.classList.toggle('show',state.slowOn[key]);
+    }
+}
+
+function replayAvatar(key){
+    const letter=state.lastLetters[key]; if(!letter)return;
+    const cid=key==='s2s'?'avatar-s2s':'avatar-conv';
+    drawHandSign(document.getElementById(cid),null);
+    setTimeout(()=>drawHandSign(document.getElementById(cid),letter),state.slowOn[key]?700:150);
+    toast(`↺ Replay: ${letter}`);
+}
+
+// ── PREDICTION ────────────────────────────────────────────────────
+async function sendPrediction(key,blob){
+    const lang=getLang(key);
+    const fd=new FormData();
+    fd.append('file',blob,'frame.jpg');
+    fd.append('lang',lang);
+
+    let url,data;
+    try{
+        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
+        if(useSentence){
+            fd.append('session_id',state.sessions[key]);
+            url=`${API}/predict_sentence`;
+        } else {
+            url=`${API}/predict`;
+        }
+        const r=await fetch(url,{method:'POST',body:fd});
+        if(!r.ok)return;
+        data=await r.json();
+    } catch(_){return;}
+
+    const letter=data.prediction||data.letter||'?';
+    const conf=data.confidence||0;
+
+    if(key==='s2t'){ displayS2TResult(letter,conf,data.top_3||[],data.hand_detected); }
+    else if(key==='s2sp'){ displayS2SpResult(letter,conf,data); }
+    else if(key==='s2s'){ displayS2SResult(letter,conf); }
+    else if(key==='conv'){ displayConvResult(letter,conf,data); }
+}
+
+function getLang(key){
+    const maps={
+        s2t:()=>document.getElementById('s2t-input-lang')?.value||'ASL',
+        s2sp:()=>document.getElementById('s2sp-input-lang')?.value||'ASL',
+        s2s:()=>document.getElementById('s2s-input-lang')?.value||'ASL',
+        conv:()=>document.getElementById('conv-lang-a')?.value||'ASL',
+    };
+    return (maps[key]||maps.s2t)().toUpperCase();
+}
+
+// ── DISPLAY ───────────────────────────────────────────────────────
+function confColor(c){ return c>0.75?'#48bb78':c>0.45?'#f6ad55':'#fc8181'; }
+
+function updateHandStatus(id,detected){
+    const el=document.getElementById(id); if(!el)return;
+    if(detected===false){el.className='hand-status missing'; el.textContent='✋ No hand detected';}
+    else{el.className='hand-status detected'; el.textContent='✅ Hand detected';}
+}
+
+function displayS2TResult(letter,conf,top3,handDetected){
+    updateHandStatus('hand-status-s2t',handDetected);
+    if(letter==='?')return;
+    document.getElementById('letter-s2t').textContent=letter;
+    const pct=Math.round(conf*100);
+    const fill=document.getElementById('conf-fill-s2t');
+    fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
+    const out=document.getElementById('text-output-s2t');
+    if(!out.textContent.trim())out.textContent=letter;
+    else if(out.textContent.slice(-1)!==letter) out.textContent+=letter;
+    const t3=document.getElementById('top3-s2t');
+    if(t3) t3.innerHTML=top3.map((p,i)=>`
+        <div class="top3-item">
+            <span class="top3-rank">${i+1}</span>
+            <span class="top3-letter">${p.class}</span>
+            <div class="top3-bar"><div class="top3-bar-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
+            <span class="top3-pct">${Math.round(p.confidence*100)}%</span>
+        </div>`).join('');
+    // Update sentence
+    if(state.sentenceOn.s2t){
+        const sentEl=document.getElementById('sentence-s2t');
+        if(sentEl&&data&&data.sentence) sentEl.textContent=data.sentence;
+    }
+}
+
+// Fix: pass data object to sentence update
+const _origDisplayS2T=displayS2TResult;
+function displayS2TResult(letter,conf,top3,handDetected,data){
+    updateHandStatus('hand-status-s2t',handDetected);
+    if(letter==='?')return;
+    document.getElementById('letter-s2t').textContent=letter;
+    const pct=Math.round(conf*100);
+    const fill=document.getElementById('conf-fill-s2t');
+    fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
+    const out=document.getElementById('text-output-s2t');
+    if(!out.textContent.trim())out.textContent=letter;
+    else if(out.textContent.slice(-1)!==letter) out.textContent+=letter;
+    document.getElementById('top3-s2t').innerHTML=top3.map((p,i)=>`
+        <div class="top3-item">
+            <span class="top3-rank">${i+1}</span><span class="top3-letter">${p.class}</span>
+            <div class="top3-bar"><div class="top3-bar-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
+            <span class="top3-pct">${Math.round(p.confidence*100)}%</span>
+        </div>`).join('');
+}
+
+// Override sendPrediction for s2t to pass data properly
+const _origSendPred=sendPrediction;
+async function sendPrediction(key,blob){
+    const lang=getLang(key);
+    const fd=new FormData();
+    fd.append('file',blob,'frame.jpg');
+    fd.append('lang',lang);
+    let url,data;
+    try{
+        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
+        if(useSentence){fd.append('session_id',state.sessions[key]); url=`${API}/predict_sentence`;}
+        else{url=`${API}/predict`;}
+        const r=await fetch(url,{method:'POST',body:fd});
+        if(!r.ok)return;
+        data=await r.json();
+    } catch(_){return;}
+    const letter=data.prediction||data.letter||'?';
+    const conf=data.confidence||0;
+    if(key==='s2t'){
+        displayS2TResult(letter,conf,data.top_3||[],data.hand_detected,data);
+        if(state.sentenceOn.s2t&&data.sentence){
+            const sentEl=document.getElementById('sentence-s2t');
+            if(sentEl) sentEl.textContent=data.sentence;
+        }
+    } else if(key==='s2sp'){ displayS2SpResult(letter,conf,data); }
+    else if(key==='s2s'){ displayS2SResult(letter,conf); }
+    else if(key==='conv'){ displayConvResult(letter,conf,data); }
+}
+
+function displayS2SpResult(letter,conf,data){
+    updateHandStatus('hand-status-s2sp',data.hand_detected);
+    if(letter==='?')return;
+    document.getElementById('letter-s2sp').textContent=letter;
+    document.getElementById('s2sp-conf').textContent=`Confidence: ${Math.round(conf*100)}%`;
+    const pct=Math.round(conf*100);
+    const fill=document.getElementById('conf-fill-s2sp');
+    fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
+    if(state.sentenceOn.s2sp&&data.sentence){
+        document.getElementById('sentence-s2sp').textContent=data.sentence;
+    }
+    if(state.autoSpeak&&letter!=='?') elevenSpeakText(letter,'s2sp-voice-lang');
+}
+
+function displayS2SResult(letter,conf){
+    document.getElementById('s2s-detected').textContent=letter;
+    const pct=Math.round(conf*100);
+    const fill=document.getElementById('conf-fill-s2s');
+    fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
+    state.lastLetters.s2s=letter;
+    animateAvatar('avatar-s2s',letter,state.slowOn.s2s);
+}
+
+function displayConvResult(letter,conf,data){
+    const isSwapped=state.roleSwapped;
+    const aLett=isSwapped?'conv-letter-b':'conv-letter-a';
+    const bLett=isSwapped?'conv-letter-a':'conv-letter-b';
+    document.getElementById(aLett).textContent=letter;
+    document.getElementById(bLett).textContent=letter;
+    const pct=Math.round(conf*100);
+    const fillA=document.getElementById(isSwapped?'conf-conv-b':'conf-conv-a');
+    const fillB=document.getElementById(isSwapped?'conf-conv-a':'conf-conv-b');
+    [fillA,fillB].forEach(f=>{if(f){f.style.width=pct+'%'; f.style.background=confColor(conf);}});
+    state.lastLetters.conv=letter;
+    animateAvatar('avatar-conv',letter,state.slowOn.conv);
+    if(data.sentence){
+        const sentA=isSwapped?'conv-sentence-b':'conv-sentence-a';
+        const sentB=isSwapped?'conv-sentence-a':'conv-sentence-b';
+        document.getElementById(sentA).textContent=data.sentence;
+        document.getElementById(sentB).textContent=data.sentence;
+    }
+}
+
+// ── TTS ───────────────────────────────────────────────────────────
+async function elevenSpeakText(text, voiceLangEl='s2t-output-lang'){
+    if(!text||text.trim()==='?')return;
+    if(!state.elevenKey){ toast('🔑 Add ElevenLabs key first (top right)'); showKeyModal(); return; }
+    const lang=document.getElementById(voiceLangEl)?.value||'en';
+    const fd=new FormData();
+    fd.append('text',text); fd.append('lang',lang);
+    try{
+        const r=await fetch(`${API}/tts`,{
+            method:'POST', body:fd,
+            headers:{'X-ElevenLabs-Key':state.elevenKey}
+        });
+        if(!r.ok){ const e=await r.json(); toast(`❌ TTS: ${e.detail}`); return; }
+        const blob=await r.blob();
+        const url=URL.createObjectURL(blob);
+        const audio=new Audio(url);
+        audio.play();
+    } catch(e){ toast('❌ TTS error: '+e.message); }
+}
+
+function elevenSpeak(key){
+    const t=document.getElementById(`text-output-${key}`)?.textContent?.trim();
+    if(t) elevenSpeakText(t,`${key}-output-lang`||'s2t-output-lang');
+    else toast('No text to speak');
+}
+
+function elevenSpeakSentence(key){
+    const t=document.getElementById(`sentence-${key}`)?.textContent?.trim();
+    const langEl=key==='s2sp'?'s2sp-voice-lang':'s2t-output-lang';
+    if(t) elevenSpeakText(t,langEl);
+    else toast('No sentence yet');
+}
+
+function elevenSpeakEl(outputId,langElId){
+    const t=document.getElementById(outputId)?.textContent?.trim();
+    if(t) elevenSpeakText(t,langElId);
+    else toast('No text to speak');
+}
+
+function elevenSpeakSentenceConv(){
+    const t=document.getElementById('conv-sentence-a')?.textContent?.trim();
+    if(t) elevenSpeakText(t,'s2t-output-lang');
+    else toast('No sentence yet');
+}
+
+function toggleAutoSpeak(){
+    state.autoSpeak=!state.autoSpeak;
+    const btn=document.getElementById('btn-autospeak');
+    btn.textContent=state.autoSpeak?'🔔 ON':'🔕 OFF';
+    btn.classList.toggle('active',state.autoSpeak);
+    toast(state.autoSpeak?'🔊 Auto-speak ON (each letter)':'🔕 Auto-speak OFF');
+}
+
+// Browser fallback TTS
+function browserSpeak(key){
+    const t=document.getElementById(`text-output-${key}`)?.textContent;
+    if(t?.trim()){const u=new SpeechSynthesisUtterance(t); speechSynthesis.speak(u);}
+}
+function browserSpeakSentence(key){
+    const t=document.getElementById(`sentence-${key}`)?.textContent;
+    if(t?.trim()){const u=new SpeechSynthesisUtterance(t); speechSynthesis.speak(u);}
+    else toast('No sentence yet');
+}
+
+// ── SPEECH-TO-TEXT ────────────────────────────────────────────────
+function toggleSTT(){
+    if(state.sttRunning) stopSTT(); else startSTT();
+}
+
+function startSTT(){
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){ toast('❌ Speech recognition not supported in this browser (use Chrome/Edge)'); return; }
+    const lang=document.getElementById('stt-input-lang')?.value||'en-US';
+    const recog=new SpeechRecognition();
+    recog.lang=lang; recog.continuous=true; recog.interimResults=true;
+    recog.onstart=()=>{
+        state.sttRunning=true;
+        document.getElementById('btn-stt').textContent='⏹ Stop Listening';
+        document.getElementById('btn-stt').classList.add('active');
+        document.getElementById('stt-status-text').textContent='Listening…';
+        document.getElementById('stt-mic-icon').textContent='🎤';
+        document.getElementById('mic-pulse').classList.add('active');
+        document.getElementById('mic-pulse2').classList.add('active');
+    };
+    recog.onresult=(e)=>{
+        let interim='', final='';
+        for(let i=e.resultIndex;i<e.results.length;i++){
+            if(e.results[i].isFinal) final+=e.results[i][0].transcript;
+            else interim+=e.results[i][0].transcript;
+        }
+        document.getElementById('stt-live-transcript').textContent=interim;
+        if(final){
+            const out=document.getElementById('stt-final-output');
+            out.textContent+=(out.textContent?' ':'')+final;
+        }
+    };
+    recog.onerror=(e)=>{ toast('STT error: '+e.error); stopSTT(); };
+    recog.onend=()=>{ if(state.sttRunning) recog.start(); }; // auto-restart
+    state.sttRecog=recog;
+    recog.start();
+}
+
+function stopSTT(){
+    if(state.sttRecog){state.sttRecog.stop(); state.sttRecog=null;}
+    state.sttRunning=false;
+    document.getElementById('btn-stt').textContent='Start Listening';
+    document.getElementById('btn-stt').classList.remove('active');
+    document.getElementById('stt-status-text').textContent='Click to start listening';
+    document.getElementById('mic-pulse')?.classList.remove('active');
+    document.getElementById('mic-pulse2')?.classList.remove('active');
+}
+
+// ── TEXT UTILITIES ─────────────────────────────────────────────────
+function clearText(key){
+    document.getElementById(`text-output-${key}`).textContent='';
+    document.getElementById(`letter-${key}`).textContent='—';
+    const fill=document.getElementById(`conf-fill-${key}`);
+    if(fill){fill.style.width='0%'; fill.textContent='0%';}
+    const t3=document.getElementById(`top3-${key}`);
+    if(t3) t3.innerHTML='';
+}
+
+function copyText(key){
+    const t=document.getElementById(`text-output-${key}`)?.textContent;
+    if(t) navigator.clipboard.writeText(t).then(()=>toast('📋 Copied!'));
+}
+function copyEl(id){
+    const t=document.getElementById(id)?.textContent;
+    if(t) navigator.clipboard.writeText(t).then(()=>toast('📋 Copied!'));
+}
+
+function enlargeText(){
+    state.largeFontOn=!state.largeFontOn;
+    const el=document.getElementById('stt-final-output');
+    el.style.fontSize=state.largeFontOn?'2em':'1.15em';
+    toast(state.largeFontOn?'🔍 Large font ON':'Normal font');
+}
+
+async function clearSentence(key){
+    const el=document.getElementById(`sentence-${key}`); if(el) el.textContent='';
+    try{ await fetch(`${API}/clear_sentence/${state.sessions[key]||key}`,{method:'POST'}); } catch(_){}
+    if(key==='conv'){
+        document.getElementById('conv-sentence-a').textContent='';
+        document.getElementById('conv-sentence-b').textContent='';
+    }
+}
+
+// ── LANG CHANGE ────────────────────────────────────────────────────
+function onLangChange(key){
+    if(key==='s2t'){
+        const lang=document.getElementById('s2t-input-lang').value;
+        document.getElementById('s2t-model-note').textContent=
+            lang==='ASL'||lang==='ISL'?`Landmark MLP · ${lang} model`:`Using ASL model (${lang} data pending)`;
+        loadAlphabet();
+    }
+}
+
+function onS2SOutChange(){
+    document.getElementById('s2s-output-badge').textContent=document.getElementById('s2s-output-lang').value;
+}
+
+function swapS2SLanguages(){
+    const inSel=document.getElementById('s2s-input-lang');
+    const outSel=document.getElementById('s2s-output-lang');
+    const tmp=inSel.value; inSel.value=outSel.value; outSel.value=tmp;
+    document.getElementById('s2s-input-badge').textContent=inSel.value;
+    document.getElementById('s2s-output-badge').textContent=outSel.value;
+    toast(`Swapped: ${inSel.value} <-> ${outSel.value}`);
+}
+
+// ── CONVERSATION ROLE TOGGLE ───────────────────────────────────────
+function toggleRole(){
+    state.roleSwapped=!state.roleSwapped;
+    if(state.roleSwapped){
+        document.getElementById('badge-actor').textContent='RECEIVER'; document.getElementById('badge-actor').className='badge badge-recv';
+        document.getElementById('badge-recv').textContent='ACTOR'; document.getElementById('badge-recv').className='badge badge-actor';
+    } else {
+        document.getElementById('badge-actor').textContent='ACTOR'; document.getElementById('badge-actor').className='badge badge-actor';
+        document.getElementById('badge-recv').textContent='RECEIVER'; document.getElementById('badge-recv').className='badge badge-recv';
+    }
+    clearSentence('conv');
+    drawHandSign(document.getElementById('avatar-conv'),null);
+    toast('Roles toggled');
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg){
+    const el=document.getElementById('toast');
+    el.textContent=msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ── ElevenLabs key forwarding ──────────────────────────────────────
+// Intercept fetch to /tts and inject API key from localStorage
+const _origFetch=window.fetch;
+window.fetch=function(url,...args){
+    if(typeof url==='string'&&url.includes('/tts')&&!url.includes('/tts/status')&&!url.includes('/tts/voices')){
+        const key=state.elevenKey||localStorage.getItem('eleven_api_key')||'';
+        if(key&&args[0]&&args[0].headers){
+            args[0].headers['X-ElevenLabs-Key']=key;
+        } else if(key){
+            const opts=args[0]||{};
+            args[0]={...opts,headers:{...(opts.headers||{}),'X-ElevenLabs-Key':key}};
+        }
+    }
+    return _origFetch.call(this,url,...args);
+};
+</script>
 </body>
 </html>
