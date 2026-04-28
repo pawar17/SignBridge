@@ -20,6 +20,7 @@ fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0
 python-multipart>=0.0.6
+elevenlabs>=2.0.0
 
 # Training infrastructure
 pytorch-lightning>=2.0.0
