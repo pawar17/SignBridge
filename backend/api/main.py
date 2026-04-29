@@ -173,7 +173,8 @@ def _init_mediapipe():
         opts = mp_vision.HandLandmarkerOptions(
             base_options=base,
             num_hands=1,
-            min_hand_detection_confidence=0.3,
+            min_hand_detection_confidence=0.5,
+            min_hand_presence_score=0.5,
             running_mode=mp_vision.RunningMode.IMAGE,
         )
         _hands_detector = mp_vision.HandLandmarker.create_from_options(opts)
@@ -232,6 +233,31 @@ app.add_middleware(
 
 # per-session sentence buffer
 prediction_buffer: dict = defaultdict(lambda: {"signs": [], "last_update": datetime.now()})
+
+# rolling smoothing window — last N raw predictions per camera session
+# Using a simple deque-based majority vote for stability
+from collections import deque
+_smooth_window: dict = defaultdict(lambda: deque(maxlen=5))   # last 5 frames
+
+def _smooth_prediction(session_key: str, pred: str, conf: float) -> tuple[str, float]:
+    """
+    Simple temporal smoothing: keep last 5 predictions and return the
+    most frequent one.  If the current frame is very high confidence
+    (> 0.85) we trust it immediately.
+    """
+    if conf > 0.85:
+        _smooth_window[session_key].clear()
+        _smooth_window[session_key].append(pred)
+        return pred, conf
+
+    _smooth_window[session_key].append(pred)
+    window = list(_smooth_window[session_key])
+
+    # majority vote
+    from collections import Counter
+    vote, count = Counter(window).most_common(1)[0]
+    smoothed_conf = conf * (count / len(window))   # scale conf by agreement
+    return vote, smoothed_conf
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic models
@@ -306,13 +332,15 @@ async def get_classes(lang: str = "ASL"):
 async def predict(
     file: UploadFile = File(...),
     lang: str = Form("ASL"),
+    session_id: str = Form("default"),
 ):
     """
     Predict sign letter from a webcam frame.
 
     Parameters:
-      file  – JPEG/PNG image (form-data)
-      lang  – ASL | BSL | ISL  (default ASL)
+      file       – JPEG/PNG image (form-data)
+      lang       – ASL | BSL | ISL  (default ASL)
+      session_id – used for temporal smoothing across frames (default "default")
     """
     lang = lang.upper()
 
@@ -328,7 +356,8 @@ async def predict(
         feat     = extract_landmarks_from_pil(image)
 
         if feat is None:
-            # no hand detected — return low-confidence placeholder
+            # no hand detected — clear the smoothing window and return placeholder
+            _smooth_window[session_id].clear()
             return PredictionResponse(
                 prediction="?",
                 confidence=0.0,
@@ -339,8 +368,17 @@ async def predict(
             )
 
         result = registry.predict(lang, feat)
+        pred   = result["prediction"]
+        conf   = result["confidence"]
+
+        # temporal smoothing: average last N frames
+        smooth_key = f"{session_id}:{lang}"
+        pred, conf = _smooth_prediction(smooth_key, pred, conf)
+
         return PredictionResponse(
-            **result,
+            prediction=pred,
+            confidence=conf,
+            top_3=result["top_3"],
             success=True,
             hand_detected=True,
             lang=lang,

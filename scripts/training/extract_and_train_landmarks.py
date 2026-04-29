@@ -8,6 +8,13 @@ Supported languages (by available training data):
            + data/raw/isl/custom/ISL custom Data/        (A-Z, ~550 imgs/class)
   - BSL  -> no data; falls back to ASL model at runtime
 
+Augmentation strategy (applied during training, not extraction):
+  - Gaussian noise on landmark coords (simulate MediaPipe jitter)
+  - Random scale perturbation (simulate different hand sizes / distances)
+  - Random in-plane rotation (simulate wrist tilt)
+  - Horizontal flip (simulate left-handed signers and mirrored webcam views)
+  -> ~10x effective dataset size from augmentation alone
+
 Usage (from project root):
     python scripts/training/extract_and_train_landmarks.py --lang ASL
     python scripts/training/extract_and_train_landmarks.py --lang ISL
@@ -205,11 +212,96 @@ def load_dataset_landmarks(lang: str, verbose: bool = True):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Landmark augmentation
+# Applied on-the-fly during training (NOT during extraction/validation).
+# Goal: bridge the gap between clean studio images and real webcam input.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def augment_landmarks(feat63: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """
+    Apply random perturbations to a normalized 63-float landmark vector.
+
+    Augmentations:
+      1. Gaussian noise  – simulate MediaPipe jitter on noisy webcam frames
+      2. Scale jitter    – simulate different hand sizes / distances from camera
+      3. In-plane rotation – simulate wrist rotation / tilt
+      4. Z-axis noise    – depth is less reliable from MediaPipe, add extra noise
+
+    Returns a new 63-float array (does NOT flip; flipping is handled separately).
+    """
+    lm = feat63.reshape(21, 3).copy()
+
+    # 1. Gaussian noise (σ proportional to hand size ≈ 1.0 after normalisation)
+    noise_scale = rng.uniform(0.01, 0.04)
+    lm += rng.normal(0, noise_scale, lm.shape).astype(np.float32)
+
+    # 2. Scale jitter ±20 %
+    scale = rng.uniform(0.80, 1.20)
+    lm *= scale
+
+    # 3. In-plane (x-y) rotation ±15°
+    angle = rng.uniform(-15, 15) * np.pi / 180
+    cos_a, sin_a = np.cos(angle), np.sin(angle)
+    R = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+    lm[:, :2] = lm[:, :2] @ R.T
+
+    # 4. Extra z-axis noise (depth is least reliable)
+    lm[:, 2] += rng.normal(0, 0.05, 21).astype(np.float32)
+
+    return lm.flatten()
+
+
+def flip_landmarks_horizontal(feat63: np.ndarray) -> np.ndarray:
+    """
+    Mirror the hand shape horizontally (negate x-coordinates).
+    Simulates left-handed signers and horizontally-mirrored webcam feeds.
+    The label stays the same because we want the model to recognise both
+    orientations as the same sign class.
+    """
+    lm = feat63.reshape(21, 3).copy()
+    lm[:, 0] *= -1          # flip x (y and z unchanged)
+    return lm.flatten()
+
+
+class AugmentedLandmarkDataset(torch.utils.data.Dataset):
+    """
+    Wraps a base TensorDataset and applies landmark augmentation on-the-fly.
+
+    Each sample is:
+      - returned as-is with probability (1 - aug_prob)
+      - augmented (noise + scale + rotation) with probability aug_prob
+      - also randomly horizontally-flipped (50 %) independent of the above
+    """
+
+    def __init__(self, X: np.ndarray, y: np.ndarray,
+                 aug_prob: float = 0.8, flip_prob: float = 0.5):
+        self.X        = X.astype(np.float32)
+        self.y        = y
+        self.aug_prob = aug_prob
+        self.flip_prob = flip_prob
+        self.rng      = np.random.default_rng(seed=None)   # different each run
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        x = self.X[idx].copy()
+
+        if self.rng.random() < self.aug_prob:
+            x = augment_landmarks(x, self.rng)
+
+        if self.rng.random() < self.flip_prob:
+            x = flip_landmarks_horizontal(x)
+
+        return torch.from_numpy(x), int(self.y[idx])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Training
 # ─────────────────────────────────────────────────────────────────────────────
 
 def train_model(lang: str,
-                epochs: int = 60,
+                epochs: int = 80,
                 batch_size: int = 128,
                 lr: float = 1e-3,
                 val_split: float = 0.15):
@@ -220,16 +312,24 @@ def train_model(lang: str,
     X, y, label_to_idx = load_dataset_landmarks(lang, verbose=True)
     num_classes = len(label_to_idx)
 
-    # ── tensors ──────────────────────────────────────────────────────────────
-    X_t = torch.from_numpy(X)
-    y_t = torch.from_numpy(y)
-    dataset = TensorDataset(X_t, y_t)
+    # ── split BEFORE augmentation so validation stays clean ──────────────────
+    n         = len(X)
+    val_size  = int(n * val_split)
+    train_size = n - val_size
+    rng_split  = np.random.default_rng(42)
+    idx        = rng_split.permutation(n)
+    val_idx, train_idx = idx[:val_size], idx[val_size:]
 
-    val_size  = int(len(dataset) * val_split)
-    train_size = len(dataset) - val_size
-    train_ds, val_ds = random_split(
-        dataset, [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)
+    X_train, y_train = X[train_idx], y[train_idx]
+    X_val,   y_val   = X[val_idx],   y[val_idx]
+
+    print(f"  Train: {len(X_train)}  Val: {len(X_val)}")
+
+    # ── datasets: augmented train, clean val ──────────────────────────────────
+    train_ds = AugmentedLandmarkDataset(X_train, y_train, aug_prob=0.85, flip_prob=0.5)
+    val_ds   = torch.utils.data.TensorDataset(
+        torch.from_numpy(X_val.astype(np.float32)),
+        torch.from_numpy(y_val),
     )
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
@@ -245,12 +345,12 @@ def train_model(lang: str,
         input_dim=63,
         hidden_dims=[512, 256, 128],
         num_classes=num_classes,
-        dropout=0.3,
+        dropout=0.4,        # slightly higher dropout helps with augmented data
     ).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.05)   # soft labels help generalization
 
     best_val_acc = 0.0
     best_state   = None
@@ -274,7 +374,7 @@ def train_model(lang: str,
 
         scheduler.step()
 
-        # ── validation ───────────────────────────────────────────────────────
+        # ── validation (clean, no augmentation) ───────────────────────────────
         model.eval()
         val_correct, val_total = 0, 0
         with torch.no_grad():
@@ -340,7 +440,7 @@ def main():
     parser.add_argument("--lang", type=str, default="ALL",
                         choices=["ASL", "ISL", "ALL"],
                         help="Language to train (default: ALL)")
-    parser.add_argument("--epochs", type=int, default=60)
+    parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--batch",  type=int, default=128)
     parser.add_argument("--lr",     type=float, default=1e-3)
     args = parser.parse_args()

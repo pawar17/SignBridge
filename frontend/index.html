@@ -940,35 +940,6 @@ function replayAvatar(key){
 }
 
 // ── PREDICTION ────────────────────────────────────────────────────
-async function sendPrediction(key,blob){
-    const lang=getLang(key);
-    const fd=new FormData();
-    fd.append('file',blob,'frame.jpg');
-    fd.append('lang',lang);
-
-    let url,data;
-    try{
-        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
-        if(useSentence){
-            fd.append('session_id',state.sessions[key]);
-            url=`${API}/predict_sentence`;
-        } else {
-            url=`${API}/predict`;
-        }
-        const r=await fetch(url,{method:'POST',body:fd});
-        if(!r.ok)return;
-        data=await r.json();
-    } catch(_){return;}
-
-    const letter=data.prediction||data.letter||'?';
-    const conf=data.confidence||0;
-
-    if(key==='s2t'){ displayS2TResult(letter,conf,data.top_3||[],data.hand_detected); }
-    else if(key==='s2sp'){ displayS2SpResult(letter,conf,data); }
-    else if(key==='s2s'){ displayS2SResult(letter,conf); }
-    else if(key==='conv'){ displayConvResult(letter,conf,data); }
-}
-
 function getLang(key){
     const maps={
         s2t:()=>document.getElementById('s2t-input-lang')?.value||'ASL',
@@ -977,6 +948,31 @@ function getLang(key){
         conv:()=>document.getElementById('conv-lang-a')?.value||'ASL',
     };
     return (maps[key]||maps.s2t)().toUpperCase();
+}
+
+async function sendPrediction(key,blob){
+    const lang=getLang(key);
+    const fd=new FormData();
+    fd.append('file',blob,'frame.jpg');
+    fd.append('lang',lang);
+    fd.append('session_id',state.sessions[key]);  // always send for temporal smoothing
+
+    let url,data;
+    try{
+        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
+        url = useSentence ? `${API}/predict_sentence` : `${API}/predict`;
+        const r=await fetch(url,{method:'POST',body:fd});
+        if(!r.ok)return;
+        data=await r.json();
+    } catch(_){return;}
+
+    const letter=data.prediction||data.letter||'?';
+    const conf=data.confidence||0;
+
+    if(key==='s2t'){      displayS2TResult(letter,conf,data.top_3||[],data.hand_detected,data); }
+    else if(key==='s2sp'){ displayS2SpResult(letter,conf,data); }
+    else if(key==='s2s'){  displayS2SResult(letter,conf); }
+    else if(key==='conv'){ displayConvResult(letter,conf,data); }
 }
 
 // ── DISPLAY ───────────────────────────────────────────────────────
@@ -988,33 +984,6 @@ function updateHandStatus(id,detected){
     else{el.className='hand-status detected'; el.textContent='✅ Hand detected';}
 }
 
-function displayS2TResult(letter,conf,top3,handDetected){
-    updateHandStatus('hand-status-s2t',handDetected);
-    if(letter==='?')return;
-    document.getElementById('letter-s2t').textContent=letter;
-    const pct=Math.round(conf*100);
-    const fill=document.getElementById('conf-fill-s2t');
-    fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
-    const out=document.getElementById('text-output-s2t');
-    if(!out.textContent.trim())out.textContent=letter;
-    else if(out.textContent.slice(-1)!==letter) out.textContent+=letter;
-    const t3=document.getElementById('top3-s2t');
-    if(t3) t3.innerHTML=top3.map((p,i)=>`
-        <div class="top3-item">
-            <span class="top3-rank">${i+1}</span>
-            <span class="top3-letter">${p.class}</span>
-            <div class="top3-bar"><div class="top3-bar-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
-            <span class="top3-pct">${Math.round(p.confidence*100)}%</span>
-        </div>`).join('');
-    // Update sentence
-    if(state.sentenceOn.s2t){
-        const sentEl=document.getElementById('sentence-s2t');
-        if(sentEl&&data&&data.sentence) sentEl.textContent=data.sentence;
-    }
-}
-
-// Fix: pass data object to sentence update
-const _origDisplayS2T=displayS2TResult;
 function displayS2TResult(letter,conf,top3,handDetected,data){
     updateHandStatus('hand-status-s2t',handDetected);
     if(letter==='?')return;
@@ -1025,41 +994,17 @@ function displayS2TResult(letter,conf,top3,handDetected,data){
     const out=document.getElementById('text-output-s2t');
     if(!out.textContent.trim())out.textContent=letter;
     else if(out.textContent.slice(-1)!==letter) out.textContent+=letter;
-    document.getElementById('top3-s2t').innerHTML=top3.map((p,i)=>`
+    const t3=document.getElementById('top3-s2t');
+    if(t3) t3.innerHTML=(top3||[]).map((p,i)=>`
         <div class="top3-item">
             <span class="top3-rank">${i+1}</span><span class="top3-letter">${p.class}</span>
             <div class="top3-bar"><div class="top3-bar-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
             <span class="top3-pct">${Math.round(p.confidence*100)}%</span>
         </div>`).join('');
-}
-
-// Override sendPrediction for s2t to pass data properly
-const _origSendPred=sendPrediction;
-async function sendPrediction(key,blob){
-    const lang=getLang(key);
-    const fd=new FormData();
-    fd.append('file',blob,'frame.jpg');
-    fd.append('lang',lang);
-    let url,data;
-    try{
-        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
-        if(useSentence){fd.append('session_id',state.sessions[key]); url=`${API}/predict_sentence`;}
-        else{url=`${API}/predict`;}
-        const r=await fetch(url,{method:'POST',body:fd});
-        if(!r.ok)return;
-        data=await r.json();
-    } catch(_){return;}
-    const letter=data.prediction||data.letter||'?';
-    const conf=data.confidence||0;
-    if(key==='s2t'){
-        displayS2TResult(letter,conf,data.top_3||[],data.hand_detected,data);
-        if(state.sentenceOn.s2t&&data.sentence){
-            const sentEl=document.getElementById('sentence-s2t');
-            if(sentEl) sentEl.textContent=data.sentence;
-        }
-    } else if(key==='s2sp'){ displayS2SpResult(letter,conf,data); }
-    else if(key==='s2s'){ displayS2SResult(letter,conf); }
-    else if(key==='conv'){ displayConvResult(letter,conf,data); }
+    if(state.sentenceOn.s2t&&data&&data.sentence){
+        const sentEl=document.getElementById('sentence-s2t');
+        if(sentEl) sentEl.textContent=data.sentence;
+    }
 }
 
 function displayS2SpResult(letter,conf,data){
