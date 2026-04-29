@@ -136,10 +136,15 @@
         .mic-pulse.active { animation:pulse 1s infinite; }
 
         /* ── SENTENCE STRIP ── */
-        .sentence-strip { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:none; }
-        .sentence-strip.show { display:block; }
-        .sentence-label { font-size:.73em; text-transform:uppercase; color:var(--text-muted); letter-spacing:.06em; margin-bottom:5px; }
-        .sentence-text { font-size:1.55em; font-weight:700; color:var(--primary); letter-spacing:4px; min-height:36px; }
+        .sentence-strip { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:16px; }
+        .sentence-label { font-size:.73em; text-transform:uppercase; color:var(--text-muted); letter-spacing:.06em; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+        .sentence-text { font-size:1.45em; font-weight:700; color:var(--primary); letter-spacing:3px; min-height:38px; word-break:break-all; }
+        .sentence-word-current { color:var(--warn); }  /* current in-progress word */
+        /* hold-progress bar — shows how many frames until letter commits */
+        .hold-bar-wrap { height:5px; background:var(--surface3); border-radius:4px; margin-top:8px; overflow:hidden; }
+        .hold-bar { height:100%; background:var(--accent); width:0%; transition:width .15s linear; border-radius:4px; }
+        .commit-flash { animation: commitFlash .35s ease; }
+        @keyframes commitFlash { 0%{background:var(--accent)} 50%{background:#fff} 100%{background:var(--primary)} }
         .sentence-actions { display:flex; gap:7px; margin-top:8px; }
 
         /* ── SIGN-TO-SIGN ── */
@@ -291,11 +296,17 @@
         </div>
     </div>
 
-    <!-- Sentence strip -->
+    <!-- Sentence strip — always visible -->
     <div class="sentence-strip" id="sentence-strip-s2t">
-        <div class="sentence-label">Sentence Builder</div>
-        <div class="sentence-text" id="sentence-s2t"></div>
-        <div class="sentence-actions">
+        <div class="sentence-label">
+            <span>📝 Sentence</span>
+            <span id="word-break-hint-s2t" style="font-size:.7em;color:var(--text-muted)">hold letter steady to commit</span>
+        </div>
+        <div class="sentence-text" id="sentence-s2t">
+            <span id="sentence-words-s2t"></span><span class="sentence-word-current" id="sentence-word-current-s2t"></span>
+        </div>
+        <div class="hold-bar-wrap"><div class="hold-bar" id="hold-bar-s2t"></div></div>
+        <div class="sentence-actions" style="margin-top:8px">
             <button class="btn btn-ghost" onclick="clearSentence('s2t')">✕ Clear</button>
             <button class="btn btn-eleven" onclick="elevenSpeakSentence('s2t')">🔊 Speak via ElevenLabs</button>
             <button class="btn btn-ghost" onclick="browserSpeakSentence('s2t')">🗣 Browser TTS</button>
@@ -356,10 +367,16 @@
             </div>
             <div class="conf-bar"><div class="conf-fill" id="conf-fill-s2sp" style="width:0%">0%</div></div>
 
-            <!-- Built word -->
-            <div class="sentence-strip show" id="sentence-strip-s2sp" style="margin-top:14px">
-                <div class="sentence-label">Built Word / Sentence</div>
-                <div class="sentence-text" id="sentence-s2sp" style="letter-spacing:3px; min-height:40px"></div>
+            <!-- Built sentence -->
+            <div class="sentence-strip" id="sentence-strip-s2sp" style="margin-top:14px">
+                <div class="sentence-label">
+                    <span>📝 Sentence</span>
+                    <span style="font-size:.7em;color:var(--text-muted)">pause hand = space between words</span>
+                </div>
+                <div class="sentence-text" id="sentence-s2sp">
+                    <span id="sentence-words-s2sp"></span><span class="sentence-word-current" id="sentence-word-current-s2sp"></span>
+                </div>
+                <div class="hold-bar-wrap"><div class="hold-bar" id="hold-bar-s2sp"></div></div>
                 <div class="sentence-actions">
                     <button class="btn btn-ghost" onclick="clearSentence('s2sp')">✕ Clear</button>
                     <button class="btn btn-eleven" id="btn-speak-s2sp" onclick="elevenSpeakSentence('s2sp')">🔊 Speak via ElevenLabs</button>
@@ -623,7 +640,6 @@ const state = {
     streams:     { s2t:null, s2sp:null, s2s:null, conv:null },
     autoTimers:  { s2t:null, s2sp:null, s2s:null, conv:null },
     autoOn:      { s2t:false, s2sp:false, s2s:false, conv:false },
-    sentenceOn:  { s2t:false, s2sp:true },
     slowOn:      { s2s:false, conv:false },
     sessions:    { s2t:'sess_s2t_'+Date.now(), s2sp:'sess_s2sp_'+Date.now(), conv:'sess_conv_'+Date.now() },
     lastLetters: { s2s:null, conv:null },
@@ -905,20 +921,8 @@ function toggleAuto(key){
     }
 }
 
-function toggleSentence(key){
-    state.sentenceOn[key]=!state.sentenceOn[key];
-    const btn=document.getElementById(`btn-sentence-${key}`);
-    if(state.sentenceOn[key]){
-        btn.textContent='💬 Sentence: ON'; btn.classList.add('active');
-        const strip=document.getElementById(`sentence-strip-${key}`);
-        if(strip) strip.classList.add('show');
-    } else {
-        btn.textContent='💬 Sentence: OFF'; btn.classList.remove('active');
-        const strip=document.getElementById(`sentence-strip-${key}`);
-        if(strip) strip.classList.remove('show');
-        clearSentence(key);
-    }
-}
+// Sentence mode is always on — this is kept for backward-compat with any onclick refs
+function toggleSentence(key){ /* no-op: sentence building always active */ }
 
 function toggleSlow(key){
     state.slowOn[key]=!state.slowOn[key];
@@ -959,7 +963,8 @@ async function sendPrediction(key,blob){
 
     let url,data;
     try{
-        const useSentence=(key==='s2t'&&state.sentenceOn.s2t)||(key==='s2sp'&&state.sentenceOn.s2sp)||(key==='conv');
+        // sentence mode is always on for camera tabs — /predict_sentence handles word building
+        const useSentence = (key==='s2t'||key==='s2sp'||key==='conv');
         url = useSentence ? `${API}/predict_sentence` : `${API}/predict`;
         const r=await fetch(url,{method:'POST',body:fd});
         if(!r.ok)return;
@@ -986,14 +991,17 @@ function updateHandStatus(id,detected){
 
 function displayS2TResult(letter,conf,top3,handDetected,data){
     updateHandStatus('hand-status-s2t',handDetected);
-    if(letter==='?')return;
+
+    // always update sentence display
+    _updateSentenceDisplay('s2t', data);
+
+    if(letter==='?'||!handDetected) return;
+
     document.getElementById('letter-s2t').textContent=letter;
     const pct=Math.round(conf*100);
     const fill=document.getElementById('conf-fill-s2t');
     fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
-    const out=document.getElementById('text-output-s2t');
-    if(!out.textContent.trim())out.textContent=letter;
-    else if(out.textContent.slice(-1)!==letter) out.textContent+=letter;
+
     const t3=document.getElementById('top3-s2t');
     if(t3) t3.innerHTML=(top3||[]).map((p,i)=>`
         <div class="top3-item">
@@ -1001,24 +1009,50 @@ function displayS2TResult(letter,conf,top3,handDetected,data){
             <div class="top3-bar"><div class="top3-bar-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
             <span class="top3-pct">${Math.round(p.confidence*100)}%</span>
         </div>`).join('');
-    if(state.sentenceOn.s2t&&data&&data.sentence){
-        const sentEl=document.getElementById('sentence-s2t');
-        if(sentEl) sentEl.textContent=data.sentence;
+}
+
+function _updateSentenceDisplay(key, data){
+    if(!data) return;
+    const HOLD_FRAMES = 3;  // must match backend LETTER_HOLD_FRAMES
+
+    // Words already committed
+    const wordsEl = document.getElementById(`sentence-words-${key}`);
+    const curEl   = document.getElementById(`sentence-word-current-${key}`);
+    const holdBar = document.getElementById(`hold-bar-${key}`);
+
+    if(wordsEl){
+        const words = data.words||[];
+        wordsEl.textContent = words.length ? words.join(' ')+' ' : '';
     }
+    if(curEl){
+        curEl.textContent = data.word||'';
+        if(data.committed){ curEl.classList.add('commit-flash'); setTimeout(()=>curEl.classList.remove('commit-flash'),400); }
+    }
+    // hold-progress bar
+    if(holdBar){
+        const frames = data.frames_held||0;
+        const pct    = Math.min(100, Math.round(frames/HOLD_FRAMES*100));
+        holdBar.style.width = pct+'%';
+    }
+    // also update the plain text-output area (copyable)
+    const out = document.getElementById(`text-output-${key}`);
+    if(out && data.sentence !== undefined) out.textContent = data.sentence;
 }
 
 function displayS2SpResult(letter,conf,data){
     updateHandStatus('hand-status-s2sp',data.hand_detected);
-    if(letter==='?')return;
+    _updateSentenceDisplay('s2sp', data);
+
+    if(letter==='?'||!data.hand_detected) return;
+
     document.getElementById('letter-s2sp').textContent=letter;
     document.getElementById('s2sp-conf').textContent=`Confidence: ${Math.round(conf*100)}%`;
     const pct=Math.round(conf*100);
     const fill=document.getElementById('conf-fill-s2sp');
     fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';
-    if(state.sentenceOn.s2sp&&data.sentence){
-        document.getElementById('sentence-s2sp').textContent=data.sentence;
-    }
-    if(state.autoSpeak&&letter!=='?') elevenSpeakText(letter,'s2sp-voice-lang');
+
+    // auto-speak when a new letter is committed
+    if(state.autoSpeak && data.committed) elevenSpeakText(letter,'s2sp-voice-lang');
 }
 
 function displayS2SResult(letter,conf){
@@ -1189,12 +1223,24 @@ function enlargeText(){
 }
 
 async function clearSentence(key){
-    const el=document.getElementById(`sentence-${key}`); if(el) el.textContent='';
+    // clear backend sentence session
     try{ await fetch(`${API}/clear_sentence/${state.sessions[key]||key}`,{method:'POST'}); } catch(_){}
+    // clear frontend displays
+    const wordsEl = document.getElementById(`sentence-words-${key}`);
+    const curEl   = document.getElementById(`sentence-word-current-${key}`);
+    const holdBar = document.getElementById(`hold-bar-${key}`);
+    if(wordsEl) wordsEl.textContent='';
+    if(curEl)   curEl.textContent='';
+    if(holdBar) holdBar.style.width='0%';
+    const out = document.getElementById(`text-output-${key}`);
+    if(out) out.textContent='';
+    // legacy fallback
+    const legEl=document.getElementById(`sentence-${key}`); if(legEl) legEl.textContent='';
     if(key==='conv'){
         document.getElementById('conv-sentence-a').textContent='';
         document.getElementById('conv-sentence-b').textContent='';
     }
+    toast('🗑 Sentence cleared');
 }
 
 // ── LANG CHANGE ────────────────────────────────────────────────────

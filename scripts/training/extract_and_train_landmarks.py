@@ -94,11 +94,31 @@ def _make_detector():
 # Each entry: (root_dir, case_transform)
 #   root_dir       – folder whose immediate children are class-name sub-dirs
 #   case_transform – 'upper' | 'lower' | None
+#
+# Priority order for ASL:
+#   1. grassknoted/asl-alphabet   (87K imgs, 29 classes, 3000/class) — BEST
+#      Download: python scripts/download_datasets.py --lang ASL
+#   2. custom_original/asl_dataset (70 imgs/class)  — fallback if 1 absent
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _asl_sources():
+    """Return best available ASL dataset source(s)."""
+    # Preferred: large public dataset (downloaded via scripts/download_datasets.py)
+    big = DATA_ROOT / "asl" / "asl_alphabet"
+    if big.exists() and any(big.iterdir()):
+        imgs = sum(len(list(d.iterdir())) for d in big.iterdir() if d.is_dir())
+        print(f"  [ASL] Using asl_alphabet dataset ({imgs:,} images)")
+        return [(big, "upper")]
+
+    # Fallback: small custom dataset already present in repo
+    small = DATA_ROOT / "asl" / "custom_original" / "asl_dataset"
+    print(f"  [ASL] Using small fallback dataset (70 imgs/class).")
+    print(f"        Run `python scripts/download_datasets.py` for the 87K-image dataset.")
+    return [(small, "upper")]
+
+
 DATASETS = {
-    "ASL": [
-        (DATA_ROOT / "asl" / "custom_original" / "asl_dataset", "upper"),
-    ],
+    "ASL": _asl_sources(),
     "ISL": [
         (DATA_ROOT / "isl" / "numbers_and_letters",           "upper"),
         (DATA_ROOT / "isl" / "custom" / "ISL custom Data",   "upper"),

@@ -231,8 +231,110 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# per-session sentence buffer
-prediction_buffer: dict = defaultdict(lambda: {"signs": [], "last_update": datetime.now()})
+# ─────────────────────────────────────────────────────────────────────────────
+# Sentence builder
+#
+# State per session:
+#   current_letter   – letter currently being held (for dedup)
+#   letter_frames    – how many consecutive frames showing current_letter
+#   current_word     – letters accumulated into the word being signed
+#   words            – list of completed words (sentence so far)
+#   last_hand_time   – last time a hand was detected
+#   last_letter_time – last time a new letter was appended
+#   no_hand_count    – consecutive frames with no hand (for word-break detection)
+#
+# Rules:
+#   • A letter is committed after LETTER_HOLD_FRAMES consecutive identical frames
+#   • Holding a letter steady does NOT keep appending it (dedup)
+#   • When no hand is detected for WORD_BREAK_FRAMES consecutive frames
+#     → current word ends, a space is inserted
+#   • When no hand for SESSION_RESET_SECS the whole sentence resets
+# ─────────────────────────────────────────────────────────────────────────────
+
+LETTER_HOLD_FRAMES  = 3    # frames a letter must be stable before committing
+WORD_BREAK_FRAMES   = 8    # consecutive no-hand frames → end of word (≈ 2-3 s at 3 fps)
+SESSION_RESET_SECS  = 30   # seconds of total inactivity → full sentence reset
+
+def _new_session():
+    return {
+        "current_letter":   None,
+        "letter_frames":    0,
+        "current_word":     [],    # list of committed letters in current word
+        "words":            [],    # list of completed word strings
+        "last_hand_time":   None,
+        "last_letter_time": datetime.now(),
+        "no_hand_count":    0,
+    }
+
+sentence_sessions: dict = defaultdict(_new_session)
+
+
+def _build_sentence(sess: dict) -> str:
+    """Reconstruct the sentence from completed words + current partial word."""
+    parts = list(sess["words"])
+    if sess["current_word"]:
+        parts.append("".join(sess["current_word"]))
+    return " ".join(parts)
+
+
+def _sentence_step(session_id: str, letter: str | None, conf: float) -> dict:
+    """
+    Feed one frame into the sentence builder.
+    letter=None means no hand detected this frame.
+    Returns updated sentence state.
+    """
+    sess = sentence_sessions[session_id]
+    now  = datetime.now()
+
+    # ── full reset after long silence ─────────────────────────────────────
+    if sess["last_letter_time"] and (now - sess["last_letter_time"]).total_seconds() > SESSION_RESET_SECS:
+        sentence_sessions[session_id] = _new_session()
+        sess = sentence_sessions[session_id]
+
+    # ── no hand detected ──────────────────────────────────────────────────
+    if letter is None:
+        sess["no_hand_count"] += 1
+        sess["current_letter"]  = None
+        sess["letter_frames"]   = 0
+
+        if sess["no_hand_count"] >= WORD_BREAK_FRAMES and sess["current_word"]:
+            # commit current word → move to words list
+            sess["words"].append("".join(sess["current_word"]))
+            sess["current_word"] = []
+
+        return {
+            "committed": False,
+            "letter":    None,
+            "sentence":  _build_sentence(sess),
+            "words":     list(sess["words"]),
+            "word":      "".join(sess["current_word"]),
+        }
+
+    # ── hand detected ─────────────────────────────────────────────────────
+    sess["no_hand_count"]  = 0
+    sess["last_hand_time"] = now
+
+    if letter == sess["current_letter"]:
+        sess["letter_frames"] += 1
+    else:
+        sess["current_letter"] = letter
+        sess["letter_frames"]  = 1
+
+    committed = False
+    if sess["letter_frames"] == LETTER_HOLD_FRAMES:
+        # stable for enough frames → commit this letter
+        sess["current_word"].append(letter)
+        sess["last_letter_time"] = now
+        committed = True
+
+    return {
+        "committed": committed,
+        "letter":    letter,
+        "sentence":  _build_sentence(sess),
+        "words":     list(sess["words"]),
+        "word":      "".join(sess["current_word"]),
+        "frames_held": sess["letter_frames"],
+    }
 
 # rolling smoothing window — last N raw predictions per camera session
 # Using a simple deque-based majority vote for stability
@@ -394,9 +496,26 @@ async def predict_sentence(
     file: UploadFile = File(...),
     lang: str = Form("ASL"),
     session_id: str = Form("default"),
-    buffer_time: int = Form(10),
 ):
-    """Predict + build up a sentence letter-by-letter."""
+    """
+    Predict one frame and update the sentence builder for this session.
+
+    Sentence building rules:
+      - A letter must be held for LETTER_HOLD_FRAMES (~3) consecutive stable frames
+        before it is committed (prevents jitter-spam).
+      - When no hand is detected for WORD_BREAK_FRAMES (~8) frames, the current
+        word is closed and a space is inserted.
+      - Full sentence resets after SESSION_RESET_SECS of inactivity.
+
+    Returns:
+      letter       – current frame prediction ('?' if no hand)
+      confidence   – model confidence for this frame
+      committed    – whether this frame committed a new letter
+      word         – letters in the current in-progress word
+      sentence     – full sentence built so far (words separated by spaces)
+      frames_held  – how many consecutive frames the current letter has been held
+      hand_detected
+    """
     lang = lang.upper()
 
     try:
@@ -405,35 +524,40 @@ async def predict_sentence(
         feat     = extract_landmarks_from_pil(image)
 
         if feat is None:
+            # no hand — feed None into sentence builder (may trigger word break)
+            _smooth_window[f"{session_id}:{lang}"].clear()
+            state = _sentence_step(session_id, None, 0.0)
             return {
-                "letter": "?",
-                "confidence": 0.0,
-                "sentence": "".join(prediction_buffer[session_id]["signs"]),
-                "word": "".join(prediction_buffer[session_id]["signs"]),
-                "sign_count": len(prediction_buffer[session_id]["signs"]),
-                "top_3": [],
-                "success": False,
+                "letter":       "?",
+                "confidence":   0.0,
+                "committed":    False,
+                "word":         state["word"],
+                "sentence":     state["sentence"],
+                "frames_held":  0,
+                "top_3":        [],
+                "success":      False,
                 "hand_detected": False,
-                "lang": lang,
+                "lang":         lang,
             }
 
         result = registry.predict(lang, feat)
-        letter = result["prediction"]
+        pred   = result["prediction"]
+        conf   = result["confidence"]
 
-        buf = prediction_buffer[session_id]
-        if datetime.now() - buf["last_update"] > timedelta(seconds=buffer_time):
-            buf["signs"] = []
-        if not buf["signs"] or buf["signs"][-1] != letter:
-            buf["signs"].append(letter)
-        buf["last_update"] = datetime.now()
+        # temporal smoothing
+        smooth_key   = f"{session_id}:{lang}"
+        pred, conf   = _smooth_prediction(smooth_key, pred, conf)
 
-        sentence = "".join(buf["signs"])
+        # sentence builder
+        state = _sentence_step(session_id, pred, conf)
+
         return {
-            "letter":       letter,
-            "confidence":   result["confidence"],
-            "sentence":     sentence,
-            "word":         sentence,
-            "sign_count":   len(buf["signs"]),
+            "letter":       pred,
+            "confidence":   conf,
+            "committed":    state["committed"],
+            "word":         state["word"],
+            "sentence":     state["sentence"],
+            "frames_held":  state.get("frames_held", 0),
             "top_3":        result["top_3"],
             "success":      True,
             "hand_detected": True,
@@ -447,7 +571,10 @@ async def predict_sentence(
 
 @app.post("/clear_sentence/{session_id}")
 async def clear_sentence(session_id: str):
-    prediction_buffer[session_id] = {"signs": [], "last_update": datetime.now()}
+    sentence_sessions[session_id] = _new_session()
+    _smooth_window[f"{session_id}:ASL"].clear()
+    _smooth_window[f"{session_id}:ISL"].clear()
+    _smooth_window[f"{session_id}:BSL"].clear()
     return {"status": "cleared", "session_id": session_id}
 
 
