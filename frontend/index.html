@@ -989,6 +989,8 @@ function updateHandStatus(id,detected){
     else{el.className='hand-status detected'; el.textContent='✅ Hand detected';}
 }
 
+const SPECIAL = new Set(['NOTHING','DEL','SPACE','nothing','del','space']);
+
 function displayS2TResult(letter,conf,top3,handDetected,data){
     updateHandStatus('hand-status-s2t',handDetected);
 
@@ -997,7 +999,9 @@ function displayS2TResult(letter,conf,top3,handDetected,data){
 
     if(letter==='?'||!handDetected) return;
 
-    document.getElementById('letter-s2t').textContent=letter;
+    // show special classes with icons instead of raw text
+    const displayLetter = letter==='DEL'?'⌫':letter==='SPACE'?'␣':SPECIAL.has(letter)?'…':letter;
+    document.getElementById('letter-s2t').textContent=displayLetter;
     const pct=Math.round(conf*100);
     const fill=document.getElementById('conf-fill-s2t');
     fill.style.width=pct+'%'; fill.style.background=confColor(conf); fill.textContent=pct+'%';

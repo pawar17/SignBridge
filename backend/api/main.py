@@ -277,11 +277,19 @@ def _build_sentence(sess: dict) -> str:
     return " ".join(parts)
 
 
+# Special class names from the ASL Alphabet dataset
+_SPECIAL_CLASSES = {"NOTHING", "DEL", "SPACE", "del", "nothing", "space"}
+
+
 def _sentence_step(session_id: str, letter: str | None, conf: float) -> dict:
     """
     Feed one frame into the sentence builder.
-    letter=None means no hand detected this frame.
-    Returns updated sentence state.
+
+    Special classes (from ASL Alphabet dataset):
+      NOTHING – background / no recognizable sign  → treated like no hand
+      SPACE   – space gesture                       → commit word boundary immediately
+      DEL     – delete gesture                      → remove last committed letter
+    letter=None means MediaPipe found no hand this frame.
     """
     sess = sentence_sessions[session_id]
     now  = datetime.now()
@@ -291,29 +299,90 @@ def _sentence_step(session_id: str, letter: str | None, conf: float) -> dict:
         sentence_sessions[session_id] = _new_session()
         sess = sentence_sessions[session_id]
 
-    # ── no hand detected ──────────────────────────────────────────────────
-    if letter is None:
+    # ── normalise special classes ─────────────────────────────────────────
+    letter_upper = letter.upper() if letter else None
+
+    # NOTHING / no hand → same path
+    if letter_upper in (None, "NOTHING"):
         sess["no_hand_count"] += 1
         sess["current_letter"]  = None
         sess["letter_frames"]   = 0
 
         if sess["no_hand_count"] >= WORD_BREAK_FRAMES and sess["current_word"]:
-            # commit current word → move to words list
             sess["words"].append("".join(sess["current_word"]))
             sess["current_word"] = []
 
         return {
-            "committed": False,
-            "letter":    None,
-            "sentence":  _build_sentence(sess),
-            "words":     list(sess["words"]),
-            "word":      "".join(sess["current_word"]),
+            "committed":   False,
+            "letter":      letter,
+            "sentence":    _build_sentence(sess),
+            "words":       list(sess["words"]),
+            "word":        "".join(sess["current_word"]),
+            "frames_held": 0,
         }
 
-    # ── hand detected ─────────────────────────────────────────────────────
     sess["no_hand_count"]  = 0
     sess["last_hand_time"] = now
 
+    # ── SPACE gesture → immediate word break ─────────────────────────────
+    if letter_upper == "SPACE":
+        if letter_upper == sess["current_letter"]:
+            sess["letter_frames"] += 1
+        else:
+            sess["current_letter"] = letter_upper
+            sess["letter_frames"]  = 1
+
+        committed = False
+        if sess["letter_frames"] == LETTER_HOLD_FRAMES:
+            if sess["current_word"]:
+                sess["words"].append("".join(sess["current_word"]))
+                sess["current_word"] = []
+            sess["last_letter_time"] = now
+            committed = True
+
+        return {
+            "committed":   committed,
+            "letter":      "SPACE",
+            "sentence":    _build_sentence(sess),
+            "words":       list(sess["words"]),
+            "word":        "".join(sess["current_word"]),
+            "frames_held": sess["letter_frames"],
+        }
+
+    # ── DEL gesture → delete last committed letter ────────────────────────
+    if letter_upper == "DEL":
+        if letter_upper == sess["current_letter"]:
+            sess["letter_frames"] += 1
+        else:
+            sess["current_letter"] = letter_upper
+            sess["letter_frames"]  = 1
+
+        committed = False
+        if sess["letter_frames"] == LETTER_HOLD_FRAMES:
+            if sess["current_word"]:
+                sess["current_word"].pop()
+            elif sess["words"]:
+                # pop last letter from previous word
+                last = list(sess["words"][-1])
+                if last:
+                    last.pop()
+                    if last:
+                        sess["words"][-1] = "".join(last)
+                    else:
+                        sess["words"].pop()
+            sess["last_letter_time"] = now
+            committed = True
+
+        return {
+            "committed":   committed,
+            "letter":      "DEL",
+            "sentence":    _build_sentence(sess),
+            "words":       list(sess["words"]),
+            "word":        "".join(sess["current_word"]),
+            "frames_held": sess["letter_frames"],
+        }
+
+    # ── regular letter ────────────────────────────────────────────────────
     if letter == sess["current_letter"]:
         sess["letter_frames"] += 1
     else:
@@ -322,17 +391,16 @@ def _sentence_step(session_id: str, letter: str | None, conf: float) -> dict:
 
     committed = False
     if sess["letter_frames"] == LETTER_HOLD_FRAMES:
-        # stable for enough frames → commit this letter
         sess["current_word"].append(letter)
         sess["last_letter_time"] = now
         committed = True
 
     return {
-        "committed": committed,
-        "letter":    letter,
-        "sentence":  _build_sentence(sess),
-        "words":     list(sess["words"]),
-        "word":      "".join(sess["current_word"]),
+        "committed":   committed,
+        "letter":      letter,
+        "sentence":    _build_sentence(sess),
+        "words":       list(sess["words"]),
+        "word":        "".join(sess["current_word"]),
         "frames_held": sess["letter_frames"],
     }
 
