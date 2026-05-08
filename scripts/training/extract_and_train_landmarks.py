@@ -203,10 +203,19 @@ def load_dataset_landmarks(lang: str, verbose: bool = True):
           f"({skipped} skipped – no hand detected)")
     return X, y, label_to_idx
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Training & Augmentation
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Training
-# ─────────────────────────────────────────────────────────────────────────────
+def augment_landmarks(Xb: torch.Tensor, jitter_std: float = 0.015) -> torch.Tensor:
+    """
+    Data Augmentation: Add random Gaussian noise to the landmark coordinates.
+    This simulates camera shake, motion blur, or MediaPipe tracking jitter,
+    making the MLP significantly more robust to imperfect real-world inputs.
+    """
+    noise = torch.randn_like(Xb) * jitter_std
+    return Xb + noise
+
 
 def train_model(lang: str,
                 epochs: int = 60,
@@ -262,8 +271,12 @@ def train_model(lang: str,
 
         for Xb, yb in train_loader:
             Xb, yb = Xb.to(device), yb.to(device)
+            
+            # Apply landmark augmentation during training
+            Xb_aug = augment_landmarks(Xb)
+            
             optimizer.zero_grad()
-            logits = model(Xb)
+            logits = model(Xb_aug)
             loss   = criterion(logits, yb)
             loss.backward()
             optimizer.step()
