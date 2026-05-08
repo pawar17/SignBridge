@@ -303,7 +303,7 @@ async def get_classes(lang: str = "ASL"):
 
 
 @app.post("/predict", response_model=PredictionResponse)
-async def predict(
+def predict(
     file: UploadFile = File(...),
     lang: str = Form("ASL"),
 ):
@@ -323,7 +323,7 @@ async def predict(
         )
 
     try:
-        contents = await file.read()
+        contents = file.file.read()
         image    = Image.open(io.BytesIO(contents))
         feat     = extract_landmarks_from_pil(image)
 
@@ -352,7 +352,7 @@ async def predict(
 
 
 @app.post("/predict_sentence")
-async def predict_sentence(
+def predict_sentence(
     file: UploadFile = File(...),
     lang: str = Form("ASL"),
     session_id: str = Form("default"),
@@ -362,7 +362,7 @@ async def predict_sentence(
     lang = lang.upper()
 
     try:
-        contents = await file.read()
+        contents = file.file.read()
         image    = Image.open(io.BytesIO(contents))
         feat     = extract_landmarks_from_pil(image)
 
@@ -507,7 +507,7 @@ async def learn(letter: str):
 
 
 @app.post("/practice/{letter}")
-async def practice(
+def practice(
     letter: str,
     file: UploadFile = File(...),
     lang: str = Form("ASL"),
@@ -515,7 +515,7 @@ async def practice(
     target = letter.upper()
     lang   = lang.upper()
     try:
-        contents = await file.read()
+        contents = file.file.read()
         image    = Image.open(io.BytesIO(contents))
         feat     = extract_landmarks_from_pil(image)
 
