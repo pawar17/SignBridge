@@ -1,0 +1,11 @@
+{
+  "ASL": {
+    "holdout": 0.9265,
+    "cross_dataset": 0.4914,
+    "samples": 44735
+  },
+  "ISL": {
+    "holdout": 0.7332,
+    "samples": 3473
+  }
+}

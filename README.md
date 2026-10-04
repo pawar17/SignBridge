@@ -1,236 +1,67 @@
-# SignBridge: Bidirectional Sign Language Translation & Learning Platform
+# SignBridge
 
-![Project Status](https://img.shields.io/badge/status-in--development-yellow)
-![License](https://img.shields.io/badge/license-MIT-blue)
+Fingerspelling translation between sign and speech, and between sign languages, running entirely in the browser.
 
-## Overview
+**Live demo: https://pawar17.github.io/SignBridge/**
 
-SignBridge is an AI-powered platform that facilitates bidirectional communication between sign language users and non-signers through real-time translation, while providing an adaptive learning environment for sign language acquisition.
+| Mode | What it does |
+| --- | --- |
+| Sign → Text | Fingerspell to the camera. SignBridge reads each handshape, types it, and can speak the result aloud. |
+| Speech → Sign | Say or type a word or name. It plays back as a fingerspelled sequence of real handshapes. |
+| Sign → Sign | Fingerspell in one language (ASL, ISL or BSL) and see the same letters in another. |
+| Teach | Record your own version of any letter. Recognition adapts to your hands and camera. |
 
-### Key Features
+The camera view draws the 21-point MediaPipe hand skeleton live, so you can see exactly what the model is reading. Video never leaves the device.
 
-- **Bidirectional Translation**: Real-time sign language ↔ text/speech translation
-- **Multi-Language Support**: ASL, ISL, BSL, JSL, LSF with dialect recognition
-- **Adaptive Learning**: Personalized sign language learning curriculum
-- **Context-Aware Processing**: Understands grammar differences between sign and spoken languages
-- **Privacy-First**: On-device processing options for sensitive environments
-- **Accessible Design**: WCAG 2.2 AAA compliance
+## How it works
 
-## Project Structure
+1. **Hand tracking.** MediaPipe Hand Landmarker (WASM, served with the app) finds up to two hands and 21 landmarks per hand, every frame.
+2. **Handshape features.** Each hand becomes 42 numbers that don't depend on where the hand is, how far it is from the camera, or which hand it is: 15 joint-bend angles, fingertip-to-fingertip and fingertip-to-wrist distances scaled by palm size, hand tilt, and fingertip positions in the palm's own frame. Two-handed alphabets (ISL, BSL) add the second hand and the offset between them (87 numbers). Training data is mirrored so left- and right-handed signers both work.
+3. **Classifier.** A small neural network (MLP 128-64) trained in scikit-learn and exported to JSON. The browser runs the forward pass itself, so there's no server and no ML runtime to download.
+4. **Typing.** Predictions are smoothed over a short window. A letter is typed once it's held steady (~0.65 s); dropping your hand adds a space.
+5. **Personalization.** Letters you teach are stored in your browser and matched with nearest-neighbour search. Near a taught sample, your examples outweigh the base model.
 
-```
-SignBridge/
-├── docs/                 # Documentation
-├── data/                 # Datasets and processed data
-├── models/               # ML models and training code
-├── backend/              # FastAPI backend
-├── frontend/             # React frontend
-├── notebooks/            # Jupyter notebooks
-├── scripts/              # Utility scripts
-├── tests/                # Test files
-└── docker/               # Docker configurations
-```
+The features are computed identically in Python (`scripts/training/train_browser_models.py`) and TypeScript (`web/src/lib/features.ts`). Running the exported model through the browser code reproduces the training predictions (99.6% agreement on the ASL landmark set).
 
-## Quick Start
+## Accuracy, honestly
 
-### Prerequisites
+| Language | Data | Held-out accuracy | Notes |
+| --- | --- | --- | --- |
+| ASL | 44,735 samples, two public datasets | 92.7% | Trained on one dataset and tested on the other (new signers): 49%. Teaching a few letters closes most of that gap. J and Z involve motion; the static handshape is used. |
+| ISL | 3,473 samples (from 12,637 images where a hand was detected) | 73.3% | Beta. The source images are 100×100, so landmark detection is noisy. |
+| BSL | None usable | n/a | No public BSL fingerspelling landmark dataset worked, so BSL runs entirely on letters you teach. |
 
-- Python 3.10+
-- Node.js 18+
-- CUDA-compatible GPU (recommended for training)
-- Docker & Docker Compose (for deployment)
+Held-out accuracy is measured on a random 15% split. The cross-dataset number is the better guide to how it does for a new person on a new camera, which is why Teach exists.
 
-### Installation
+What this does **not** do: full sign language translation. Signed languages use movement, facial grammar and space; this reads fingerspelled letters only.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/SignBridge.git
-   cd SignBridge
-   ```
+## Data and licenses
 
-2. **Set up Python environment**
-   ```bash
-   conda create -n signbridge python=3.10
-   conda activate signbridge
-   pip install -r requirements.txt
-   ```
+- ASL: [AgEnt-F0X/ASL-Recognition-System](https://github.com/AgEnt-F0X/ASL-Recognition-System) keypoints (MIT) and [lmohammedaariff/Real-Time-ASL-Alphabet-Recognition-Using-Normalized-Hand-Landmarks](https://github.com/lmohammedaariff/Real-Time-ASL-Alphabet-Recognition-Using-Normalized-Hand-Landmarks) landmarks
+- ISL: [ayesha-hannure/Indian-Sign-Language-dataset](https://github.com/ayesha-hannure/Indian-Sign-Language-dataset) (Apache-2.0), landmarks extracted with `scripts/training/extract_isl_landmarks.py`
+- Hand tracking: [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) (Apache-2.0)
 
-3. **Set up frontend**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-4. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-### Running the Application
-
-**Development Mode:**
+## Run locally
 
 ```bash
-# Backend
-cd backend
-uvicorn api.main:app --reload
-
-# Frontend
-cd frontend
-npm start
+cd web
+npm install
+npm run dev
 ```
 
-**Production Mode (Docker):**
+Retrain the models (writes to `web/public/models`):
 
 ```bash
-docker-compose up -d
+pip install scikit-learn numpy mediapipe
+python scripts/training/extract_isl_landmarks.py <isl_dataset_dir> isl_landmarks.jsonl
+python scripts/training/train_browser_models.py --asl-kp keypoint.csv --asl-lm landmarks.csv \
+    --isl isl_landmarks.jsonl --out web/public/models
 ```
 
-## Datasets
+## Repository
 
-SignBridge uses multiple sign language datasets:
+- `web/`: the app (Vite, React, TypeScript)
+- `scripts/training/`: landmark extraction and model training
+- `backend/`, `frontend/`, `models/`, `notebooks/`: the earlier server-based prototype, kept for reference ([old README](docs/README_v1.md))
 
-- **ASL MNIST**: 27,456 training + 7,173 test samples
-- **Custom ASL Dataset**: 36 classes (0-9, a-z)
-- **Indian Sign Language**: Custom collected dataset
-- **German Sign Language**: CSV dataset with alphabet reference
-
-See `data/README.md` for detailed dataset information.
-
-## Development
-
-### Data Preprocessing
-
-```bash
-python scripts/data_preprocessing/landmark_extractor.py
-python scripts/data_preprocessing/dataset_builder.py
-```
-
-### Model Training
-
-```bash
-python scripts/training/train_model.py --config configs/train_config.yaml
-```
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-## Documentation
-
-- [Product Requirements Document](docs/PRD.md)
-- [Implementation Guide](docs/implementation_guide.md)
-- [Claude Code Guide](docs/claude_code_guide.md)
-- [API Documentation](docs/api/)
-- [Architecture](docs/architecture/)
-
-## Technology Stack
-
-**Frontend:**
-- React.js with TypeScript
-- Three.js for 3D avatar rendering
-- TensorFlow.js for on-device inference
-- Material-UI components
-
-**Backend:**
-- FastAPI (Python)
-- PyTorch for ML models
-- MediaPipe for pose estimation
-- PostgreSQL database
-- Redis for caching
-
-**ML/AI:**
-- Custom Transformer + LSTM hybrid for sign recognition
-- Seq2Seq model for text-to-sign generation
-- MediaPipe Holistic for landmark extraction
-
-**Infrastructure:**
-- Docker & Kubernetes
-- AWS/GCP for cloud deployment
-- GitHub Actions for CI/CD
-
-## Roadmap
-
-### Phase 1: Foundation (Months 1-3) ✓
-- [x] Project setup and structure
-- [x] Dataset collection and organization
-- [ ] Basic sign recognition model
-- [ ] MVP translation interface
-
-### Phase 2: Enhancement (Months 4-6)
-- [ ] Bidirectional translation
-- [ ] Multi-language support (ASL + ISL)
-- [ ] Adaptive learning system
-- [ ] Mobile-responsive UI
-
-### Phase 3: Scale & Research (Months 7-12)
-- [ ] Multi-language support (BSL, JSL, LSF)
-- [ ] Production deployment
-- [ ] Research paper submissions
-- [ ] Community partnerships
-
-## Contributing
-
-We welcome contributions from the community! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Research & Publications
-
-SignBridge is designed with research goals in mind:
-
-- **Few-shot signer adaptation** for personalization
-- **Cross-lingual sign language transfer** learning
-- **Grammar-aware translation** preserving linguistic structure
-- **Cognitive load assessment** for accessible learning
-
-## Ethics & Privacy
-
-- **Community Partnership**: Development guided by DHH advisory board
-- **Privacy-First**: On-device processing options available
-- **Transparent AI**: Clear communication about capabilities and limitations
-- **Accessibility**: Tool itself fully usable by DHH individuals
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- MediaPipe team for pose estimation tools
-- Sign language datasets: WLASL, How2Sign, MS-ASL, INCLUDE
-- DHH community for guidance and feedback
-- Open-source contributors
-
-## Contact
-
-- **Project Lead**: [Your Name]
-- **Email**: your.email@example.com
-- **Website**: https://signbridge.example.com
-- **Issues**: [GitHub Issues](https://github.com/yourusername/SignBridge/issues)
-
-## Citation
-
-If you use SignBridge in your research, please cite:
-
-```bibtex
-@software{signbridge2024,
-  title={SignBridge: Bidirectional Sign Language Translation and Learning Platform},
-  author={Your Name},
-  year={2024},
-  url={https://github.com/yourusername/SignBridge}
-}
-```
-
----
-
-**Made with ❤️ for the Deaf and Hard of Hearing community**
+Built by [Aadya Pawar](https://aadyapawar.com).
